@@ -66,4 +66,4 @@ jobs:
         env:
           IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
           IMAGE_NAME: ghcr.io/${{ github.repository }}
-        run: printf 'Published `%s@%s`\n' "$IMAGE_NAME" "$IMAGE_DIGEST" >> "$GITHUB_STEP_SUMMARY"
+        run: printf 'Published image: %s@%s\n' "$IMAGE_NAME" "$IMAGE_DIGEST" >> "$GITHUB_STEP_SUMMARY"

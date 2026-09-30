@@ -69,8 +69,8 @@ The fork's `CI and container` workflow runs lint, unit tests, type checking and
 an application build on pull requests and pushes to `main`. After checks pass,
 main builds publish amd64/arm64 images to `ghcr.io/arch-err/it-tools` with a full
 `sha-<commit>` tag and `latest`. Publishing uses `GITHUB_TOKEN` with job-scoped
-`packages: write`; Docker Hub credentials are not required. Inherited upstream
-nightly/release jobs are guarded so this fork cannot publish upstream images.
+`packages: write`; Docker Hub credentials are not required. Upstream-only nightly/release workflows are removed from this fork; publishing
+is handled by the main workflow.
 
 The package must be public for anonymous cluster pulls. The public cluster
 instance uses a pinned image digest; future builds do not silently upgrade it.
