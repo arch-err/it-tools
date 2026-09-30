@@ -1,15 +1,47 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n';
 import InputCopyable from '../../components/InputCopyable.vue';
 import { isNotThrowing } from '@/utils/boolean';
 import { withDefaultOnError } from '@/utils/defaults';
+import { useQueryParam } from '@/composable/queryParams';
 
-const urlToParse = ref('https://me:pwd@it-tools.tech:3000/url-parser?key1=value&key2=value2#the-hash');
+const { t } = useI18n();
+
+const urlToParse = useQueryParam({
+  tool: 'url-parser',
+  name: 'url',
+  defaultValue:
+    'https://me:pwd@sharevb-it-tools.vercel.app:3000/url-parser?key=value&keyarr=value1&keyarr=value2&otherarg#the-hash',
+});
 
 const urlParsed = computed(() => withDefaultOnError(() => new URL(urlToParse.value), undefined));
+const urlParsedParams = computed(() => {
+  const params: { key: string; value: string }[] = [];
+  const usedKeys = new Set();
+  for (const key of urlParsed.value?.searchParams.keys() ?? []) {
+    // searchParams.keys() reports as many times the key as it appears in the params, so use only first occurrence
+    if (usedKeys.has(key)) {
+      continue;
+    }
+    usedKeys.add(key);
+    const values = urlParsed.value?.searchParams.getAll(key) ?? [];
+    if (values.length > 1) {
+      // print out multiple values at the place of the first occurrence of param
+      let index = 0;
+      values.forEach((value) => {
+        params.push({ key: `${key}[${index}]`, value: value ?? '' });
+        index += 1;
+      });
+      continue;
+    }
+    params.push({ key, value: urlParsed.value?.searchParams.get(key) ?? '' });
+  }
+  return params;
+});
 const urlValidationRules = [
   {
     validator: (value: string) => isNotThrowing(() => new URL(value)),
-    message: 'Invalid url',
+    message: t('tools.url-parser.texts.message-invalid-url'),
   },
 ];
 
@@ -18,8 +50,10 @@ const properties: { title: string; key: keyof URL }[] = [
   { title: 'Username', key: 'username' },
   { title: 'Password', key: 'password' },
   { title: 'Hostname', key: 'hostname' },
+  { title: 'Host', key: 'host' },
   { title: 'Port', key: 'port' },
   { title: 'Path', key: 'pathname' },
+  { title: 'Fragment', key: 'hash' },
   { title: 'Params', key: 'search' },
 ];
 </script>
@@ -28,8 +62,8 @@ const properties: { title: string; key: keyof URL }[] = [
   <c-card>
     <c-input-text
       v-model:value="urlToParse"
-      label="Your url to parse:"
-      placeholder="Your url to parse..."
+      :label="t('tools.url-parser.texts.label-your-url-to-parse')"
+      :placeholder="t('tools.url-parser.texts.placeholder-your-url-to-parse')"
       raw-text
       :validation-rules="urlValidationRules"
     />
@@ -48,19 +82,16 @@ const properties: { title: string; key: keyof URL }[] = [
       placeholder=" "
     />
 
-    <div
-      v-for="[k, v] in Object.entries(Object.fromEntries(urlParsed?.searchParams.entries() ?? []))"
-      :key="k"
-      mb-2
-      w-full
-      flex
-    >
+    <div v-for="param in urlParsedParams" :key="param.key" mb-2 w-full flex>
       <div style="flex: 1 0 110px">
         <icon-mdi-arrow-right-bottom />
       </div>
 
-      <InputCopyable :value="k" readonly />
-      <InputCopyable :value="v" readonly />
+      <InputCopyable :value="param.key" readonly mr-1 style="width: 40%" />
+      <InputCopyable :value="param.value" readonly mr-1 />
+      <c-button v-if="/^[a-z]+:\/\//.test(param.value || '')" target="_blank" :href="param.value">
+        {{ t('tools.url-parser.texts.button-open-url') }}
+      </c-button>
     </div>
   </c-card>
 </template>

@@ -1,0 +1,13 @@
+import { defineTool } from '../tool';
+import { translate as t } from '@/plugins/i18n.plugin';
+
+export const tool = defineTool({
+  name: t('tools.certificate-key-parser.title'),
+  path: '/certificate-key-parser',
+  description: t('tools.certificate-key-parser.description'),
+  keywords: ['certificate', 'key', 'parser'],
+  component: () => import('./certificate-key-parser.vue'),
+  icon: defineAsyncComponent(() => import('@vicons/tabler/es/FileCertificate')),
+  createdAt: new Date('2024-02-22'),
+  category: 'Crypto',
+});

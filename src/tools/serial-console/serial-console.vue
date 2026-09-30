@@ -1,0 +1,131 @@
+<script setup lang="ts">
+import { useI18n } from 'vue-i18n';
+import { nextTick, onMounted, ref } from 'vue';
+import { NButton, NCard, NInput, NInputGroup, NSelect, NSpace } from 'naive-ui';
+import { useSerialPort } from './useSerialPort';
+
+const { t } = useI18n();
+
+const input = ref('');
+const outputRef = ref<HTMLElement | null>(null);
+const selectedPort = ref<SerialPort | undefined>();
+
+const { isConnected, outputLines, baudRate, lineEnding, availablePorts, connect, disconnect, send, listPorts } =
+  useSerialPort();
+
+const baudOptions = [
+  { label: t('tools.serial-console.texts.label-9600'), value: 9600 },
+  { label: t('tools.serial-console.texts.label-19200'), value: 19200 },
+  { label: t('tools.serial-console.texts.label-38400'), value: 38400 },
+  { label: t('tools.serial-console.texts.label-57600'), value: 57600 },
+  { label: t('tools.serial-console.texts.label-115200'), value: 115200 },
+];
+
+const lineEndingOptions = [
+  { label: t('tools.serial-console.texts.label-lf-n'), value: 'LF' },
+  { label: t('tools.serial-console.texts.label-cr-r'), value: 'CR' },
+  { label: t('tools.serial-console.texts.label-crlf-r-n'), value: 'CRLF' },
+];
+
+const portOptions = computed(() =>
+  availablePorts.value.map((p, i) => ({
+    label: `Port ${i + 1} (${p.getInfo().usbVendorId ?? 'Unknown'})`,
+    value: p,
+  })),
+);
+
+function sendCommand() {
+  if (!input.value.trim()) {
+    return;
+  }
+  send(input.value);
+  input.value = '';
+  nextTick(() => {
+    outputRef.value?.scrollTo({ top: outputRef.value.scrollHeight, behavior: 'smooth' });
+  });
+}
+
+onMounted(() => {
+  listPorts();
+});
+
+function isWindowSecureContext() {
+  return window.isSecureContext;
+}
+</script>
+
+<template>
+  <c-alert v-if="!isWindowSecureContext()" mb-2>
+    {{ $t('tools.pgp-encryption.texts.tag-your-browser-is-not-in')
+    }}<n-a href="https://developer.mozilla.org/en-US/docs/Web/Security/Secure_Contexts" target="_blank">
+      {{ $t('tools.pgp-encryption.texts.tag-secure-context-https') }} </n-a
+    >{{ $t('tools.pgp-encryption.texts.tag-this-tool-may-not-work-correctly-and-require-https-to-work-fully') }}
+  </c-alert>
+
+  <NCard :title="t('tools.serial-console.texts.title-serial-terminal')">
+    <NSpace>
+      <NSelect
+        v-model:value="baudRate"
+        :options="baudOptions"
+        :placeholder="t('tools.serial-console.texts.placeholder-baud-rate')"
+        style="width: 150px"
+      />
+      <NSelect
+        v-model:value="lineEnding"
+        :options="lineEndingOptions"
+        :placeholder="t('tools.serial-console.texts.placeholder-line-ending')"
+        style="width: 120px"
+      />
+      <NSelect
+        :value="selectedPort as any"
+        :options="portOptions as any"
+        @update:value="(v: any) => (selectedPort = v)"
+        label-field="label"
+        value-field="value"
+        :placeholder="t('tools.serial-console.texts.placeholder-select-port')"
+        style="width: 200px"
+      />
+      <NButton type="primary" :disabled="isConnected" @click="connect(selectedPort)">
+        {{ t('tools.serial-console.texts.tag-connect') }}
+      </NButton>
+      <NButton type="error" :disabled="!isConnected" @click="disconnect">
+        {{ t('tools.serial-console.texts.tag-disconnect') }}
+      </NButton>
+    </NSpace>
+
+    <div ref="outputRef" class="terminal-output">
+      <div v-for="(line, index) in outputLines" :key="index" class="terminal-line">
+        {{ line }}
+      </div>
+    </div>
+
+    <NInputGroup>
+      <NInput
+        v-model:value="input"
+        :placeholder="t('tools.serial-console.texts.placeholder-type-a-command')"
+        :disabled="!isConnected"
+        @keydown.enter.prevent="sendCommand"
+      />
+      <NButton type="primary" :disabled="!isConnected" @click="sendCommand">
+        {{ t('tools.serial-console.texts.tag-send') }}
+      </NButton>
+    </NInputGroup>
+  </NCard>
+</template>
+
+<style scoped>
+.terminal-output {
+  background-color: #000;
+  color: #0f0;
+  font-family: monospace;
+  padding: 1rem;
+  height: 300px;
+  overflow-y: auto;
+  border-radius: 4px;
+  margin: 1rem 0;
+  box-shadow: inset 0 0 5px #0f0;
+}
+.terminal-line {
+  white-space: pre-wrap;
+}
+</style>

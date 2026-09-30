@@ -1,0 +1,13 @@
+import { defineTool } from '../tool';
+import { translate as t } from '@/plugins/i18n.plugin';
+
+export const tool = defineTool({
+  name: t('tools.json-escaper.title'),
+  path: '/json-escaper',
+  description: t('tools.json-escaper.description'),
+  keywords: ['json', 'string', 'escape', 'unescape'],
+  component: () => import('./json-escaper.vue'),
+  icon: defineAsyncComponent(() => import('@vicons/tabler/es/Braces')),
+  createdAt: new Date('2024-03-09'),
+  category: 'JSON',
+});

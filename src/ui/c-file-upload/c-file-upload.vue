@@ -1,26 +1,55 @@
 <script lang="ts" setup>
-import _ from 'lodash';
+import * as _ from 'es-toolkit/compat';
 
-const props = withDefaults(defineProps<{
-  multiple?: boolean
-  accept?: string
-  title?: string
-}>(), {
-  multiple: false,
-  accept: undefined,
-  title: 'Drag and drop files here, or click to select files',
-});
+const props = withDefaults(
+  defineProps<{
+    multiple?: boolean;
+    accept?: string;
+    title?: string;
+    pasteImage?: boolean;
+  }>(),
+  {
+    multiple: false,
+    accept: undefined,
+    title: 'Drag and drop files here, or click to select files',
+    pasteImage: false,
+  },
+);
 
 const emit = defineEmits<{
-  (event: 'filesUpload', files: File[]): void
-  (event: 'fileUpload', file: File): void
+  (event: 'filesUpload', files: File[]): void;
+  (event: 'fileUpload', file: File): void;
 }>();
 
-const { multiple } = toRefs(props);
+const { multiple, pasteImage } = toRefs(props);
 
 const isOverDropZone = ref(false);
 
+function toBase64(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result?.toString() ?? '');
+    reader.onerror = (error) => reject(error);
+  });
+}
+
 const fileInput = ref<HTMLInputElement | null>(null);
+const imgPreview = ref<HTMLImageElement | null>(null);
+function clearPreview() {
+  if (imgPreview.value) {
+    imgPreview.value.src = '';
+  }
+}
+async function handlePreview(image: File) {
+  if (imgPreview.value) {
+    if (image.type?.includes('image/')) {
+      imgPreview.value.src = await toBase64(image);
+    } else {
+      clearPreview();
+    }
+  }
+}
 
 function triggerFileInput() {
   fileInput.value?.click();
@@ -39,7 +68,30 @@ function handleDrop(event: DragEvent) {
   handleUpload(files);
 }
 
-function handleUpload(files: FileList | null | undefined) {
+async function onPasteImage(evt: ClipboardEvent) {
+  if (!pasteImage.value) {
+    return false;
+  }
+
+  const items = evt.clipboardData?.items;
+  if (!items) {
+    return false;
+  }
+  for (let i = 0; i < items.length; i++) {
+    if (items[i].type.includes('image')) {
+      const imageFile = items[i].getAsFile();
+      if (imageFile) {
+        await handlePreview(imageFile);
+        emit('fileUpload', imageFile);
+      }
+    }
+  }
+  return true;
+}
+
+async function handleUpload(files: FileList | null | undefined) {
+  clearPreview();
+
   if (_.isNil(files) || _.isEmpty(files)) {
     return;
   }
@@ -49,6 +101,7 @@ function handleUpload(files: FileList | null | undefined) {
     return;
   }
 
+  await handlePreview(files[0]);
   emit('fileUpload', files[0]);
 }
 </script>
@@ -60,19 +113,14 @@ function handleUpload(files: FileList | null | undefined) {
       'border-primary border-opacity-100': isOverDropZone,
     }"
     @click="triggerFileInput"
+    @paste.prevent="onPasteImage"
     @drop.prevent="handleDrop"
     @dragover.prevent
     @dragenter="isOverDropZone = true"
     @dragleave="isOverDropZone = false"
   >
-    <input
-      ref="fileInput"
-      type="file"
-      class="hidden"
-      :multiple="multiple"
-      :accept="accept"
-      @change="handleFileInput"
-    >
+    <input ref="fileInput" type="file" class="hidden" :multiple="multiple" :accept="accept" @change="handleFileInput" />
+
     <slot>
       <span op-70>
         {{ title }}
@@ -81,15 +129,25 @@ function handleUpload(files: FileList | null | undefined) {
       <!-- separator -->
       <div my-4 w-full flex items-center justify-center op-70>
         <div class="h-1px max-w-100px flex-1 bg-gray-300 op-50" />
-        <div class="mx-2 text-gray-400">
-          or
-        </div>
+        <div class="mx-2 text-gray-400">or</div>
         <div class="h-1px max-w-100px flex-1 bg-gray-300 op-50" />
       </div>
 
-      <c-button>
-        Browse files
-      </c-button>
+      <c-button> Browse files </c-button>
+
+      <div v-if="pasteImage">
+        <!-- separator -->
+        <div my-4 w-full flex items-center justify-center op-70>
+          <div class="h-1px max-w-100px flex-1 bg-gray-300 op-50" />
+          <div class="mx-2 text-gray-400">or</div>
+          <div class="h-1px max-w-100px flex-1 bg-gray-300 op-50" />
+        </div>
+
+        <p>Paste an image from clipboard</p>
+      </div>
     </slot>
+    <div mt-2>
+      <img ref="imgPreview" width="150" />
+    </div>
   </div>
 </template>

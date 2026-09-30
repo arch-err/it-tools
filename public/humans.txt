@@ -1,4 +1,4 @@
 /* TEAM */
 Developer: Corentin Thomasset
-Site: https://github.com/CorentinTh
-Twitter: @cthmsst
+Site: https://github.com/sharevb
+Twitter: @sharevb

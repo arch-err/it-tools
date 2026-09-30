@@ -1,49 +1,127 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n';
+import type sshpk from 'sshpk';
 import { generateKeyPair } from './rsa-key-pair-generator.service';
 import TextareaCopyable from '@/components/TextareaCopyable.vue';
 import { withDefaultOnErrorAsync } from '@/utils/defaults';
 import { useValidation } from '@/composable/validation';
 import { computedRefreshableAsync } from '@/composable/computedRefreshable';
+import { useITStorage } from '@/composable/queryParams';
+
+const { t } = useI18n();
 
 const bits = ref(2048);
-const emptyCerts = { publicKeyPem: '', privateKeyPem: '' };
+const comment = ref('');
+const password = ref('');
+const debouncedComment = useDebounce(comment, 250);
+const debouncedPassword = useDebounce(password, 250);
+const emptyCerts = { publicKey: '', privateKey: '', fingerprint: '', md5Fingerprint: '' };
+
+const format = useITStorage('rsa-key-pair-generator:format', 'ssh');
+const formatOptions = [
+  { value: 'pem', label: t('tools.rsa-key-pair-generator.texts.label-pem') },
+  { value: 'pkcs1', label: t('tools.rsa-key-pair-generator.texts.label-pkcs-1') },
+  { value: 'pkcs8', label: t('tools.rsa-key-pair-generator.texts.label-pkcs-8') },
+  { value: 'ssh', label: t('tools.rsa-key-pair-generator.texts.label-openssh-standard') },
+  { value: 'openssh', label: t('tools.rsa-key-pair-generator.texts.label-openssh-new') },
+  { value: 'putty', label: t('tools.rsa-key-pair-generator.texts.label-putty') },
+];
+
+const supportsPassphrase = computed(() => format.value === 'pem' || format.value === 'ssh');
 
 const { attrs: bitsValidationAttrs } = useValidation({
   source: bits,
   rules: [
     {
-      message: 'Bits should be 256 <= bits <= 16384 and be a multiple of 8',
-      validator: value => value >= 256 && value <= 16384 && value % 8 === 0,
+      message: t(
+        'tools.rsa-key-pair-generator.text.bits-should-be-256-less-than-bits-less-than-16384-and-be-a-multiple-of-8',
+      ),
+      validator: (value) => value >= 256 && value <= 16384 && value % 8 === 0,
     },
   ],
 });
 
 const [certs, refreshCerts] = computedRefreshableAsync(
-  () => withDefaultOnErrorAsync(() => generateKeyPair({ bits: bits.value }), emptyCerts),
+  () =>
+    withDefaultOnErrorAsync(
+      () =>
+        generateKeyPair({
+          bits: bits.value,
+          password: debouncedPassword.value,
+          format: format.value as sshpk.PrivateKeyFormatType,
+          comment: debouncedComment.value,
+        }),
+      emptyCerts,
+    ),
   emptyCerts,
 );
 </script>
 
 <template>
-  <div style="flex: 0 0 100%">
-    <div item-style="flex: 1 1 0" style="max-width: 600px" mx-auto flex gap-3>
-      <n-form-item label="Bits :" v-bind="bitsValidationAttrs as any" label-placement="left" label-width="100">
-        <n-input-number v-model:value="bits" min="256" max="16384" step="8" />
+  <div>
+    <n-space justify="space-between" mb-1>
+      <c-select
+        v-model:value="format"
+        label-position="left"
+        :label="t('tools.rsa-key-pair-generator.texts.label-format')"
+        :options="formatOptions"
+        :placeholder="t('tools.rsa-key-pair-generator.texts.placeholder-select-a-key-format')"
+      />
+
+      <n-form-item
+        :label="t('tools.rsa-key-pair-generator.texts.label-bits')"
+        v-bind="bitsValidationAttrs as any"
+        label-placement="left"
+      >
+        <n-input-number-i18n v-model:value="bits" min="256" max="16384" step="8" />
       </n-form-item>
+    </n-space>
 
-      <c-button @click="refreshCerts">
-        Refresh key-pair
-      </c-button>
+    <div v-if="supportsPassphrase" mb-1>
+      <n-form-item :label="t('tools.rsa-key-pair-generator.texts.label-passphrase')" label-placement="left">
+        <n-input
+          v-model:value="password"
+          type="password"
+          show-password-on="mousedown"
+          :placeholder="t('tools.rsa-key-pair-generator.texts.placeholder-passphrase')"
+        />
+      </n-form-item>
     </div>
-  </div>
 
-  <div>
-    <h3>Public key</h3>
-    <TextareaCopyable :value="certs.publicKeyPem" />
-  </div>
+    <div mb-1>
+      <n-form-item :label="t('tools.rsa-key-pair-generator.texts.label-comment')" label-placement="left">
+        <n-input
+          v-model:value="comment"
+          type="text"
+          :placeholder="t('tools.rsa-key-pair-generator.texts.placeholder-comment')"
+        />
+      </n-form-item>
+    </div>
 
-  <div>
-    <h3>Private key</h3>
-    <TextareaCopyable :value="certs.privateKeyPem" />
+    <n-space justify="center" mb-1>
+      <c-button @click="refreshCerts">
+        {{ t('tools.rsa-key-pair-generator.texts.tag-refresh-key-pair') }}
+      </c-button>
+    </n-space>
+
+    <div>
+      <h3>{{ t('tools.rsa-key-pair-generator.texts.tag-public-key') }}</h3>
+      <TextareaCopyable :value="certs.publicKey" :word-wrap="true" />
+    </div>
+
+    <div>
+      <h3>{{ t('tools.rsa-key-pair-generator.texts.tag-private-key') }}</h3>
+      <TextareaCopyable :value="certs.privateKey" />
+    </div>
+
+    <div>
+      <h3>{{ t('tools.rsa-key-pair-generator.texts.tag-fingerprint') }}</h3>
+      <TextareaCopyable :value="certs.fingerprint" />
+    </div>
+
+    <div>
+      <h3>{{ t('tools.rsa-key-pair-generator.texts.tag-md5-fingerprint') }}</h3>
+      <TextareaCopyable :value="certs.md5Fingerprint" />
+    </div>
   </div>
 </template>

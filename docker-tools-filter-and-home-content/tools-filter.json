@@ -1,0 +1,6 @@
+{
+  "excludeCategoryFilterRegex": "^(Gaming|Maths|Physics)$",
+  "includeCategoryFilterRegex": "",
+  "excludeToolsFilterRegex": "ai-prompt-splitter",
+  "includeToolsFilterRegex": "illuminance-converter"
+}

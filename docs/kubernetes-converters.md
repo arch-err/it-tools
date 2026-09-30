@@ -89,3 +89,7 @@ is handled by the main workflow.
 
 The package must be public for anonymous cluster pulls. The public cluster
 instance uses a pinned image digest; future builds do not silently upgrade it.
+
+## Fork base
+
+This fork tracks `sharevb/it-tools`, branch `chore/all-my-stuffs` (base `fad759e`, release 2026.09.27). The Kubernetes suite, Harbor fixtures, and GHCR publishing workflow are maintained in `arch-err/it-tools`.

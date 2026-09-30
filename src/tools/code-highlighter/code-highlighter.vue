@@ -1,0 +1,142 @@
+<script setup lang="ts">
+import { useI18n } from 'vue-i18n';
+import { bundledLanguagesInfo, createHighlighter } from 'shiki/bundle/full';
+import { bundledThemesInfo } from 'shiki/themes';
+import { useQueryParamOrStorage } from '@/composable/queryParams';
+import { useCopy, useCopyHtml } from '@/composable/copy';
+
+const { t } = useI18n();
+
+const code = ref(`// Using 'typeof' to infer types
+const person = { name: "Alice", age: 30 };
+type PersonType = typeof person;  // { name: string; age: number }
+
+// 'satisfies' to ensure a type matches but allows more specific types
+type Animal = { name: string };
+const dog = { name: "Buddy", breed: "Golden Retriever" } satisfies Animal;
+
+// Generics with 'extends' and default values
+function identity<T extends number | string = string>(arg: T): T {
+  return arg;
+}`);
+
+const themes = ref<{ value: string; label: string }[]>(
+  bundledThemesInfo.map((item) => {
+    return {
+      value: item.id,
+      label: item.displayName,
+    };
+  }),
+);
+const langs = ref<{ value: string; label: string }[]>(
+  bundledLanguagesInfo.map((item) => ({
+    value: item.id,
+    label: item.name,
+  })),
+);
+
+const currentTheme = useQueryParamOrStorage({
+  name: 'theme',
+  storageName: 'code-highlighter:theme',
+  defaultValue: 'dark-plus',
+});
+const currentLang = useQueryParamOrStorage({
+  name: 'lang',
+  storageName: 'code-highlighter:lang',
+  defaultValue: 'typescript',
+});
+
+const showLineNumbers = ref(false);
+
+const formattedCodeHtml = computedAsync(async () => {
+  const currentThemeValue = currentTheme.value;
+  const currentLangValue = currentLang.value;
+  const codeValue = code.value;
+  const needLineNumbers = showLineNumbers.value;
+
+  const lineNumberWidth = Math.log10(codeValue.split('\n').length) + 2;
+
+  const highlighter = await createHighlighter({
+    langs: [currentLangValue],
+    themes: [currentThemeValue],
+  });
+  return highlighter.codeToHtml(codeValue, {
+    lang: currentLangValue,
+    theme: currentThemeValue,
+    transformers: [
+      {
+        postprocess(html: string) {
+          // when copied to clipboard and pasted to LibreOffice,
+          // formatting of first line is only kept if there is a line break before...
+          const ensureFirstLineFormattedWhenCopied = (html: string) => html.replace('<code>', '<code>\n');
+          if (!needLineNumbers) {
+            return ensureFirstLineFormattedWhenCopied(html);
+          }
+          let lineNumber = 1;
+          return html
+            .replace(/<span class="line/g, (m) => {
+              const lineNumberFormatted = (lineNumber++).toString().padStart(lineNumberWidth, ' ');
+              return `<span class="line-number" style="white-space-collapse: preserve">${lineNumberFormatted}  </span>${m}`;
+            })
+            .replace('<code>', '<code>\n');
+        },
+      },
+    ],
+  });
+});
+const { copy: copyHtml } = useCopyHtml({ sourceHtml: formattedCodeHtml });
+const { copy: copyText } = useCopy({ source: code });
+</script>
+
+<template>
+  <div>
+    <div mb-3 flex items-baseline gap-1>
+      <c-select
+        v-model:value="currentLang"
+        :label="t('tools.code-highlighter.texts.label-language')"
+        label-position="left"
+        searchable
+        :options="langs"
+        flex-1
+      />
+      <c-select
+        v-model:value="currentTheme"
+        :label="t('tools.code-highlighter.texts.label-theme')"
+        label-position="left"
+        searchable
+        :options="themes"
+        flex-1
+      />
+    </div>
+
+    <c-input-text
+      v-model:value="code"
+      :label="t('tools.code-highlighter.texts.label-code-snippet-to-format')"
+      multiline
+      :placeholder="t('tools.code-highlighter.texts.placeholder-put-your-code-snippet-here')"
+      rows="5"
+      mb-3
+    />
+
+    <div flex justify-center gap-2>
+      <n-form-item :label="t('tools.code-highlighter.texts.label-show-line-numbers')" label-placement="left">
+        <n-switch v-model:value="showLineNumbers" />
+      </n-form-item>
+      <c-button @click="copyHtml()">
+        {{ t('tools.code-highlighter.texts.tag-copy-html-word') }}
+      </c-button>
+      <c-button @click="copyText()">
+        {{ t('tools.code-highlighter.texts.tag-copy-code-text') }}
+      </c-button>
+    </div>
+
+    <div v-html="formattedCodeHtml" />
+    <!-- //NOSONAR -->
+  </div>
+</template>
+
+<style scoped>
+::v-deep(.line-number) {
+  text-wrap: nowrap;
+}
+</style>

@@ -1,12 +1,14 @@
-import { Artboard } from '@vicons/tabler';
 import { defineTool } from '../tool';
+import { translate as t } from '@/plugins/i18n.plugin';
 
 export const tool = defineTool({
-  name: 'ASCII Art Text Generator',
+  name: t('tools.ascii-text-drawer.title'),
   path: '/ascii-text-drawer',
-  description: 'Create ASCII art text with many fonts and styles.',
+  description: t('tools.ascii-text-drawer.description'),
   keywords: ['ascii', 'asciiart', 'text', 'drawer'],
   component: () => import('./ascii-text-drawer.vue'),
-  icon: Artboard,
+  icon: defineAsyncComponent(() => import('@vicons/tabler/es/Artboard')),
   createdAt: new Date('2024-03-03'),
+  npmPackages: ['figlet'],
+  category: 'Text',
 });

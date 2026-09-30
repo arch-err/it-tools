@@ -1,30 +1,35 @@
 import { extension as getExtensionFromMimeType, extension as getMimeTypeFromExtension } from 'mime-types';
-import type { Ref } from 'vue';
-import _ from 'lodash';
+import type { MaybeRef, Ref } from 'vue';
+import * as _ from 'es-toolkit/compat';
+import { get } from '@vueuse/core';
 
 export {
   getMimeTypeFromBase64,
-  getMimeTypeFromExtension, getExtensionFromMimeType,
-  useDownloadFileFromBase64, useDownloadFileFromBase64Refs,
+  getMimeTypeFromExtension,
+  getExtensionFromMimeType,
+  useDownloadFileFromBase64,
+  useDownloadFileFromBase64Refs,
   previewImageFromBase64,
 };
 
 const commonMimeTypesSignatures = {
-  'JVBERi0': 'application/pdf',
-  'R0lGODdh': 'image/gif',
-  'R0lGODlh': 'image/gif',
-  'iVBORw0KGgo': 'image/png',
+  JVBERi0: 'application/pdf',
+  R0lGODdh: 'image/gif',
+  R0lGODlh: 'image/gif',
+  iVBORw0KGgo: 'image/png',
   '/9j/': 'image/jpg',
 };
 
 function getMimeTypeFromBase64({ base64String }: { base64String: string }) {
-  const [,mimeTypeFromBase64] = base64String.match(/data:(.*?);base64/i) ?? [];
+  const [, mimeTypeFromBase64] = base64String.match(/data:(.*?);base64/i) ?? [];
 
   if (mimeTypeFromBase64) {
     return { mimeType: mimeTypeFromBase64 };
   }
 
-  const inferredMimeType = _.find(commonMimeTypesSignatures, (_mimeType, signature) => base64String.startsWith(signature));
+  const inferredMimeType = _.find(commonMimeTypesSignatures, (_mimeType, signature) =>
+    base64String.startsWith(signature),
+  );
 
   if (inferredMimeType) {
     return { mimeType: inferredMimeType };
@@ -37,8 +42,8 @@ function getFileExtensionFromMimeType({
   mimeType,
   defaultExtension = 'txt',
 }: {
-  mimeType: string | undefined
-  defaultExtension?: string
+  mimeType: string | undefined;
+  defaultExtension?: string;
 }) {
   if (mimeType) {
     return getExtensionFromMimeType(mimeType) ?? defaultExtension;
@@ -47,8 +52,17 @@ function getFileExtensionFromMimeType({
   return defaultExtension;
 }
 
-function downloadFromBase64({ sourceValue, filename, extension, fileMimeType }:
-{ sourceValue: string; filename?: string; extension?: string; fileMimeType?: string }) {
+function downloadFromBase64({
+  sourceValue,
+  filename,
+  extension,
+  fileMimeType,
+}: {
+  sourceValue: string;
+  filename?: string;
+  extension?: string;
+  fileMimeType?: string;
+}) {
   if (sourceValue === '') {
     throw new Error('Base64 string is empty');
   }
@@ -61,8 +75,7 @@ function downloadFromBase64({ sourceValue, filename, extension, fileMimeType }:
     base64String = `data:${targetMimeType};base64,${sourceValue}`;
   }
 
-  const cleanExtension = extension ?? getFileExtensionFromMimeType(
-    { mimeType, defaultExtension });
+  const cleanExtension = extension ?? getFileExtensionFromMimeType({ mimeType, defaultExtension });
   let cleanFileName = filename ?? `file.${cleanExtension}`;
   if (extension && !cleanFileName.endsWith(`.${extension}`)) {
     cleanFileName = `${cleanFileName}.${cleanExtension}`;
@@ -74,22 +87,18 @@ function downloadFromBase64({ sourceValue, filename, extension, fileMimeType }:
   a.click();
 }
 
-function useDownloadFileFromBase64(
-  { source, filename, extension, fileMimeType }:
-  { source: Ref<string>; filename?: string; extension?: string; fileMimeType?: string }) {
+function useDownloadFileFromBase64({
+  source,
+  filename,
+  extension,
+}: {
+  source: MaybeRef<string>;
+  filename?: MaybeRef<string>;
+  extension?: MaybeRef<string>;
+}) {
   return {
     download() {
-      downloadFromBase64({ sourceValue: source.value, filename, extension, fileMimeType });
-    },
-  };
-}
-
-function useDownloadFileFromBase64Refs(
-  { source, filename, extension }:
-  { source: Ref<string>; filename?: Ref<string>; extension?: Ref<string> }) {
-  return {
-    download() {
-      downloadFromBase64({ sourceValue: source.value, filename: filename?.value, extension: extension?.value });
+      downloadFromBase64({ sourceValue: get(source), filename: get(filename), extension: get(extension) });
     },
   };
 }
@@ -99,8 +108,13 @@ function previewImageFromBase64(base64String: string): HTMLImageElement {
     throw new Error('Base64 string is empty');
   }
 
+  let dataUriBase64String = base64String;
+  if (!base64String.startsWith('data:')) {
+    dataUriBase64String = `data:application/octet-stream;base64,${base64String}`;
+  }
+
   const img = document.createElement('img');
-  img.src = base64String;
+  img.src = dataUriBase64String;
 
   const container = document.createElement('div');
   container.appendChild(img);
@@ -109,10 +123,25 @@ function previewImageFromBase64(base64String: string): HTMLImageElement {
   if (previewContainer) {
     previewContainer.innerHTML = '';
     previewContainer.appendChild(container);
-  }
-  else {
+  } else {
     throw new Error('Preview container element not found');
   }
 
   return img;
+}
+
+function useDownloadFileFromBase64Refs({
+  source,
+  filename,
+  extension,
+}: {
+  source: Ref<string>;
+  filename?: Ref<string>;
+  extension?: Ref<string>;
+}) {
+  return {
+    download() {
+      downloadFromBase64({ sourceValue: source.value, filename: filename?.value, extension: extension?.value });
+    },
+  };
 }

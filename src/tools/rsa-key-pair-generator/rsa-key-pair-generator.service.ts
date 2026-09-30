@@ -1,5 +1,6 @@
 import { pki } from 'node-forge';
 import workerScript from 'node-forge/dist/prime.worker.min?url';
+import sshpk from 'sshpk';
 
 export { generateKeyPair };
 
@@ -16,11 +17,43 @@ function generateRawPairs({ bits = 2048 }) {
   );
 }
 
-async function generateKeyPair(config: { bits?: number } = {}) {
+async function generateKeyPair(
+  config: {
+    bits?: number;
+    password?: string;
+    format?: sshpk.PrivateKeyFormatType;
+    comment?: string;
+  } = {},
+) {
   const { privateKey, publicKey } = await generateRawPairs(config);
 
+  const privateUnencryptedKeyPem = pki.privateKeyToPem(privateKey);
+
+  if (config?.format === 'pem') {
+    const publicKeyPEM = pki.publicKeyToPem(publicKey);
+    const parsedPubicKey = sshpk.parseKey(publicKeyPEM);
+    return {
+      publicKey: publicKeyPEM,
+      fingerprint: publicKey ? parsedPubicKey.fingerprint('sha256').toString() : '',
+      md5Fingerprint: publicKey ? parsedPubicKey.fingerprint('md5').toString() : '',
+      privateKey: config?.password ? pki.encryptRsaPrivateKey(privateKey, config?.password) : privateUnencryptedKeyPem,
+    };
+  }
+
+  const privKey = sshpk.parsePrivateKey(privateUnencryptedKeyPem);
+  privKey.comment = config?.comment;
+  const pubFormat = config.format ?? 'ssh';
+  let privFormat = config.format ?? 'ssh';
+  if (privFormat === 'ssh') {
+    privFormat = 'ssh-private';
+  }
+  const pubKey = privKey.toPublic();
   return {
-    publicKeyPem: pki.publicKeyToPem(publicKey),
-    privateKeyPem: pki.privateKeyToPem(privateKey),
+    publicKey: pubKey.toString(pubFormat),
+    fingerprint: pubKey.fingerprint('sha256').toString(),
+    md5Fingerprint: pubKey.fingerprint('md5').toString(),
+    privateKey: config?.password
+      ? privKey.toString(privFormat, { passphrase: config?.password, comment: config?.comment })
+      : privKey.toString(privFormat, { comment: config?.comment }),
   };
 }

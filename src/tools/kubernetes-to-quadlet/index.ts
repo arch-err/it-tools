@@ -1,4 +1,3 @@
-import { BrandDocker } from '@vicons/tabler';
 import { defineTool } from '../tool';
 import { translate } from '@/plugins/i18n.plugin';
 
@@ -8,6 +7,7 @@ export const tool = defineTool({
   description: translate('tools.kubernetes-to-quadlet.description'),
   keywords: ['kubernetes', 'k8s', 'yaml', 'manifest', 'container', 'quadlet'],
   component: () => import('./kubernetes-to-quadlet.vue'),
-  icon: BrandDocker,
+  icon: defineAsyncComponent(() => import('@vicons/tabler/es/BrandDocker')),
+  category: 'Kubernetes',
   createdAt: new Date('2026-09-30'),
 });

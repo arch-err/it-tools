@@ -1,12 +1,25 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n';
+import {
+  IconCircleArrowUpRight,
+  IconCircleCheck,
+  IconDatabaseExclamation,
+  IconDeviceDesktopExclamation,
+  IconExternalLink,
+  IconInfoCircle,
+  IconSearch,
+} from '@tabler/icons-vue';
 import { codesByCategories } from './http-status-codes.constants';
-import { useFuzzySearch } from '@/composable/fuzzySearch';
+import { useFlexSearch } from '@/composable/flexSearch';
+import { useQueryParam } from '@/composable/queryParams';
 
-const search = ref('');
+const { t } = useI18n();
 
-const { searchResult } = useFuzzySearch({
+const search = useQueryParam({ tool: 'http-status-codes', name: 's', defaultValue: '' });
+
+const { searchResult } = useFlexSearch({
   search,
-  data: codesByCategories.flatMap(({ codes, category }) => codes.map(code => ({ ...code, category }))),
+  data: codesByCategories.flatMap(({ codes, category }) => codes.map((code) => ({ ...code, category }))),
   options: {
     keys: [{ name: 'code', weight: 3 }, { name: 'name', weight: 2 }, 'description', 'category'],
   },
@@ -19,28 +32,62 @@ const codesByCategoryFiltered = computed(() => {
 
   return [{ category: 'Search results', codes: searchResult.value }];
 });
+
+function getCategoryIcon(category: string) {
+  const categoryLower = category.toLowerCase();
+
+  if (categoryLower.includes('1xx')) {
+    return IconInfoCircle;
+  }
+  if (categoryLower.includes('2xx')) {
+    return IconCircleCheck;
+  }
+  if (categoryLower.includes('3xx')) {
+    return IconCircleArrowUpRight;
+  }
+  if (categoryLower.includes('4xx')) {
+    return IconDeviceDesktopExclamation;
+  }
+  if (categoryLower.includes('5xx')) {
+    return IconDatabaseExclamation;
+  }
+  // Default icon for search results or unknown categories
+  return IconSearch;
+}
+
+function openMdnDocs(code: number) {
+  window.open(`https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/${code}`, '_blank', 'noopener,noreferrer');
+}
 </script>
 
 <template>
   <div>
     <c-input-text
       v-model:value="search"
-      placeholder="Search http status..."
-      autofocus raw-text mb-10
+      :placeholder="t('tools.http-status-codes.texts.placeholder-search-http-status')"
+      autofocus
+      raw-text
+      mb-10
     />
 
     <div v-for="{ codes, category } of codesByCategoryFiltered" :key="category" mb-8>
-      <div mb-2 text-xl>
+      <div mb-2 flex items-center gap-2 text-xl font-bold>
+        <n-icon :component="getCategoryIcon(category)" size="26" />
         {{ category }}
       </div>
 
       <c-card v-for="{ code, description, name, type } of codes" :key="code" mb-2>
-        <div text-lg font-bold>
+        <div flex items-center gap-2 text-lg font-bold>
           {{ code }} {{ name }}
+          <div
+            class="flex cursor-pointer items-center justify-center rounded text-gray-500 transition-colors hover:text-blue-600"
+            :title="t('tools.http-status-codes.texts.title-view-mdn-documentation')"
+            @click="openMdnDocs(code)"
+          >
+            <n-icon :component="IconExternalLink" size="18" />
+          </div>
         </div>
-        <div op-70>
-          {{ description }} {{ type !== 'HTTP' ? `For ${type}.` : '' }}
-        </div>
+        <div op-70>{{ description }} {{ type !== 'HTTP' ? `For ${type}.` : '' }}</div>
       </c-card>
     </div>
   </div>

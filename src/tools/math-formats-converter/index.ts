@@ -1,0 +1,13 @@
+import { defineTool } from '../tool';
+import { translate as t } from '@/plugins/i18n.plugin';
+
+export const tool = defineTool({
+  name: t('tools.math-formats-converter.title'),
+  path: '/math-formats-converter',
+  description: t('tools.math-formats-converter.description'),
+  keywords: ['math', 'formats', 'converter', 'latex', 'mathml', 'asciimath', 'omml', 'html'],
+  component: () => import('./math-formats-converter.vue'),
+  icon: defineAsyncComponent(() => import('@vicons/tabler/es/EqualNot')),
+  createdAt: new Date('2024-05-11'),
+  category: 'Maths',
+});

@@ -1,11 +1,10 @@
-import { PasswordRound } from '@vicons/material';
 import { defineTool } from '../tool';
-import { translate } from '@/plugins/i18n.plugin';
+import { translate as t } from '@/plugins/i18n.plugin';
 
 export const tool = defineTool({
-  name: translate('tools.basic-auth-generator.title'),
+  name: t('tools.basic-auth-generator.title'),
   path: '/basic-auth-generator',
-  description: translate('tools.basic-auth-generator.description'),
+  description: t('tools.basic-auth-generator.description'),
   keywords: [
     'basic',
     'auth',
@@ -18,5 +17,6 @@ export const tool = defineTool({
     'authorization',
   ],
   component: () => import('./basic-auth-generator.vue'),
-  icon: PasswordRound,
+  icon: defineAsyncComponent(() => import('@vicons/material/es/PasswordRound')),
+  category: 'Network',
 });

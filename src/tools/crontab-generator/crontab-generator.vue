@@ -1,47 +1,74 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n';
 import cronstrue from 'cronstrue';
-import { isValidCron } from 'cron-validator';
+import * as ctz from 'countries-and-timezones';
+import getTimezoneOffset from 'get-timezone-offset';
+import { type CronType, getLastExecutionTimes, isCronValid } from './crontab-generator.service';
 import { useStyleStore } from '@/stores/style.store';
+import { useQueryParam, useQueryParamOrStorage } from '@/composable/queryParams';
 
-function isCronValid(v: string) {
-  return isValidCron(v, { allowBlankDay: true, alias: true, seconds: true });
-}
+const { t } = useI18n();
 
 const styleStore = useStyleStore();
 
-const cron = ref('40 * * * *');
+const cron = useQueryParam({ tool: 'crontab-gen', name: 'expr', defaultValue: '40 * * * *' });
 const cronstrueConfig = reactive({
   verbose: true,
   dayOfWeekStartIndexZero: true,
   use24HourTimeFormat: true,
   throwExceptionOnParseError: true,
+  monthStartIndexZero: false,
+  tzOffset: new Date().getTimezoneOffset() / 60,
 });
 
-const helpers = [
+// getTimezoneOffset(tz.name, now) / 60
+const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+const allTimezones = Object.values(ctz.getAllTimezones()).map((tz) => {
+  const timezoneUTCDSTOffset =
+    tz.utcOffset === tz.dstOffset ? tz.utcOffsetStr : `${tz.utcOffsetStr}/${tz.dstOffsetStr}`;
+  return {
+    value: tz.name,
+    label: `${tz.name === browserTimezone ? 'Browser TZ - ' : ''}${tz.name} (${timezoneUTCDSTOffset})`,
+  };
+});
+const currentTimezone = useQueryParamOrStorage({
+  name: 'tz',
+  storageName: 'crongen:tz',
+  defaultValue: browserTimezone,
+});
+watchEffect(() => {
+  cronstrueConfig.tzOffset = -getTimezoneOffset(currentTimezone.value, new Date()) / 60;
+});
+
+const commonHelpers = [
   {
     symbol: '*',
     meaning: 'Any value',
-    example: '* * * *',
+    example: '* * * * *',
     equivalent: 'Every minute',
   },
   {
     symbol: '-',
     meaning: 'Range of values',
-    example: '1-10 * * *',
+    example: '1-10 * * * *',
     equivalent: 'Minutes 1 through 10',
   },
   {
     symbol: ',',
     meaning: 'List of values',
-    example: '1,10 * * *',
+    example: '1,10 * * * *',
     equivalent: 'At minutes 1 and 10',
   },
   {
     symbol: '/',
     meaning: 'Step values',
-    example: '*/10 * * *',
+    example: '*/10 * * * *',
     equivalent: 'Every 10 minutes',
   },
+];
+
+const standardHelpers = [
+  ...commonHelpers,
   {
     symbol: '@yearly',
     meaning: 'Once every year at midnight of 1 January',
@@ -92,19 +119,91 @@ const helpers = [
   },
 ];
 
+const awsHelpers = [
+  ...commonHelpers,
+  {
+    symbol: '?',
+    meaning:
+      "One or another. In the Day-of-month field you could enter 7, and if you didn't care what day of the week the seventh was, you could enter ? in the Day-of-week field",
+    example: '9 * 7,9,11 5 ? 2021',
+    equivalent: 'At 9 minutes past the hour, every hour, on day 7, 9, and 11 of the month, only in May, only in 2021',
+  },
+  {
+    symbol: 'L',
+    meaning: 'The L wildcard in the Day-of-month or Day-of-week fields specifies the last day of the month or week.',
+    example: '9 * L 5 ? 2019,2020',
+    equivalent:
+      'At 9 minutes past the hour, every hour, on the last day of the month, only in May, only in 2019 and 2020',
+  },
+  {
+    symbol: 'W',
+    meaning:
+      'The W wildcard in the Day-of-month field specifies a weekday. In the Day-of-month field, 3W specifies the day closest to the third weekday of the month.',
+    example: '19 4 3W 9 ? 2019,2020',
+    equivalent: 'At 04:19 AM, on the weekday nearest day 3 of the month, only in September, only in 2019 and 2020',
+  },
+  {
+    symbol: '#',
+    meaning:
+      'The # wildcard in the Day-of-week field specifies the nieth weekday of the month. 3#5 specifies the fifth Wednesday of the month',
+    example: '9 8-20 ? 12 3#5 2019,2020',
+    equivalent:
+      'At 9 minutes past the hour, between 08:00 AM and 08:59 PM, on the fifth Wednesday of the month, only in December, only in 2019 and 2020',
+  },
+];
+
+const defaultAWSCronExpression = '0 0 ? * 1 *';
+const defaultStandardCronExpression = '40 * * * *';
+const cronType = ref<CronType>('standard');
+watch(cronType, (newCronType) => {
+  if (newCronType === 'aws') {
+    if (!cron.value || cron.value === defaultStandardCronExpression) {
+      cron.value = defaultAWSCronExpression;
+    }
+  } else if (newCronType === 'standard') {
+    if (!cron.value || cron.value === defaultAWSCronExpression) {
+      cron.value = defaultStandardCronExpression;
+    }
+  }
+});
+
+const getHelpers = computed(() => {
+  if (cronType.value === 'aws') {
+    return awsHelpers;
+  }
+  return standardHelpers;
+});
+
 const cronString = computed(() => {
   if (isCronValid(cron.value)) {
-    return cronstrue.toString(cron.value, cronstrueConfig);
+    try {
+      return cronstrue.toString(cron.value, cronstrueConfig);
+    } catch (e: any) {
+      return e.toString();
+    }
   }
   return ' ';
 });
 
 const cronValidationRules = [
   {
-    validator: (value: string) => isCronValid(value),
-    message: 'This cron is invalid',
+    validator: (value: string) => isCronValid(value, cronType.value),
+    message: t('tools.crontab-generator.texts.message-this-cron-is-invalid'),
   },
 ];
+
+const executionTimesString = computed(() => {
+  if (isCronValid(cron.value)) {
+    try {
+      const lastExecutionTimes = getLastExecutionTimes(cron.value, currentTimezone.value);
+      const executionTimesString = lastExecutionTimes.join('\n');
+      return `Next 5 execution times:\n${executionTimesString}`;
+    } catch (e: any) {
+      return e.toString();
+    }
+  }
+  return ' ';
+});
 </script>
 
 <template>
@@ -113,34 +212,55 @@ const cronValidationRules = [
       <c-input-text
         v-model:value="cron"
         size="large"
-        placeholder="* * * * *"
+        :placeholder="t('tools.crontab-generator.texts.placeholder-')"
         :validation-rules="cronValidationRules"
         mb-3
       />
     </div>
 
+    <n-radio-group v-model:value="cronType" name="radiogroup" mb-2 flex justify-center>
+      <n-space>
+        <n-radio value="standard" :label="t('tools.crontab-generator.texts.label-unix-standard')" />
+        <n-radio value="aws" :label="t('tools.crontab-generator.texts.label-aws')" />
+      </n-space>
+    </n-radio-group>
+
     <div class="cron-string">
       {{ cronString }}
+    </div>
+
+    <div class="cron-execution-string">
+      {{ executionTimesString }}
     </div>
 
     <n-divider />
 
     <div flex justify-center>
       <n-form :show-feedback="false" label-width="170" label-placement="left">
-        <n-form-item label="Verbose">
+        <n-form-item :label="t('tools.crontab-generator.texts.label-verbose')">
           <n-switch v-model:value="cronstrueConfig.verbose" />
         </n-form-item>
-        <n-form-item label="Use 24 hour time format">
+        <n-form-item :label="t('tools.crontab-generator.texts.label-use-24-hour-time-format')">
           <n-switch v-model:value="cronstrueConfig.use24HourTimeFormat" />
         </n-form-item>
-        <n-form-item label="Days start at 0">
+        <n-form-item :label="t('tools.crontab-generator.texts.label-days-start-at-0')">
           <n-switch v-model:value="cronstrueConfig.dayOfWeekStartIndexZero" />
         </n-form-item>
+        <n-form-item :label="t('tools.crontab-generator.texts.label-months-start-at-0')">
+          <n-switch v-model:value="cronstrueConfig.monthStartIndexZero" />
+        </n-form-item>
+        <c-select
+          v-model:value="currentTimezone"
+          searchable
+          :label="t('tools.crontab-generator.texts.label-timezone')"
+          :options="allTimezones"
+        />
       </n-form>
     </div>
   </c-card>
   <c-card>
-    <pre>
+    <pre v-if="cronType === 'standard'">
+      -- Standard CRON Syntax --
 ┌──────────── [optional] seconds (0 - 59)
 | ┌────────── minute (0 - 59)
 | | ┌──────── hour (0 - 23)
@@ -148,27 +268,42 @@ const cronValidationRules = [
 | | | | ┌──── month (1 - 12) OR jan,feb,mar,apr ...
 | | | | | ┌── day of week (0 - 6, sunday=0) OR sun,mon ...
 | | | | | |
-* * * * * * command</pre>
+* * * * * * command</pre
+    >
+
+    <pre v-if="cronType === 'aws'">
+      -- AWS CRON Syntax --
+┌──────────── minute (0 - 59)
+| ┌────────── hour (0 - 23)
+| | ┌──────── day of month (1 - 31) OR ? OR L OR W
+| | | ┌────── month (1 - 12) OR jan,feb,mar,apr ...
+| | | | ┌──── day of week (0 - 6, sunday=0) OR sun,mon OR L ...
+| | | | | ┌── year
+| | | | | |
+* * * * * *</pre
+    >
 
     <div v-if="styleStore.isSmallScreen">
-      <c-card v-for="{ symbol, meaning, example, equivalent } in helpers" :key="symbol" mb-3 important:border-none>
+      <c-card v-for="{ symbol, meaning, example, equivalent } in getHelpers" :key="symbol" mb-3 important:border-none>
         <div>
-          Symbol: <strong>{{ symbol }}</strong>
+          {{ t('tools.crontab-generator.texts.tag-symbol') }}<strong>{{ symbol }}</strong>
         </div>
         <div>
-          Meaning: <strong>{{ meaning }}</strong>
+          {{ t('tools.crontab-generator.texts.tag-meaning') }}<strong>{{ meaning }}</strong>
         </div>
         <div>
-          Example:
-          <strong><code>{{ example }}</code></strong>
+          {{ t('tools.crontab-generator.texts.tag-example')
+          }}<strong
+            ><code>{{ example }}</code></strong
+          >
         </div>
         <div>
-          Equivalent: <strong>{{ equivalent }}</strong>
+          {{ t('tools.crontab-generator.texts.tag-equivalent') }}<strong>{{ equivalent }}</strong>
         </div>
       </c-card>
     </div>
 
-    <c-table v-else :data="helpers" />
+    <c-table v-else :data="getHelpers" />
   </c-card>
 </template>
 
@@ -190,5 +325,13 @@ const cronValidationRules = [
 pre {
   overflow: auto;
   padding: 10px 0;
+}
+
+.cron-execution-string {
+  text-align: center;
+  font-size: 14px;
+  opacity: 0.8;
+  margin: 5px 0 15px;
+  white-space: pre-wrap;
 }
 </style>

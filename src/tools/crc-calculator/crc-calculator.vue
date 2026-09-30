@@ -1,0 +1,125 @@
+<script setup lang="ts">
+import { useI18n } from 'vue-i18n';
+
+import InputCopyable from '../../components/InputCopyable.vue';
+import type { Encoding } from '../hash-text/hash-text.service';
+import { formatHexWithEncoding } from '../hash-text/hash-text.service';
+import { algoNames as algoWasmNames, defaultCRCValues, getCRCs } from './crc-calculator.service';
+import { useQueryParamOrStorage } from '@/composable/queryParams';
+import { withDefaultOnError } from '@/utils/defaults';
+
+const { t } = useI18n();
+
+const status = ref<'idle' | 'done' | 'error' | 'processing'>('idle');
+const text = ref('');
+const file = ref<File | null>(null);
+
+const hashes = ref(defaultCRCValues);
+async function onUpload(uploadedFile: File) {
+  status.value = 'processing';
+
+  file.value = uploadedFile;
+  const buffer = await uploadedFile.arrayBuffer();
+
+  text.value = '';
+  try {
+    hashes.value = getCRCs(new Uint8Array(buffer));
+    status.value = 'done';
+  } catch (e) {
+    status.value = 'error';
+  }
+}
+
+const encoding = useQueryParamOrStorage<Encoding>({
+  defaultValue: 'Hex',
+  storageName: 'hash-text:encoding',
+  name: 'encoding',
+});
+
+const CRCValues = computed(() =>
+  withDefaultOnError(() => {
+    const encodingValue = encoding.value;
+    const hashesValue = hashes.value;
+
+    const ret = defaultCRCValues;
+    for (const algo of algoWasmNames) {
+      ret[algo] = formatHexWithEncoding(hashesValue[algo], encodingValue);
+    }
+    return ret;
+  }, defaultCRCValues),
+);
+
+watch(text, (newValue) => {
+  file.value = null;
+  hashes.value = getCRCs(newValue);
+  status.value = 'done';
+});
+</script>
+
+<template>
+  <div>
+    <c-card>
+      <c-file-upload
+        :title="t('tools.crc-calculator.texts.title-drag-and-drop-a-file-here-or-click-to-select-a-file')"
+        @file-upload="onUpload"
+      />
+
+      <p>{{ t('tools.crc-calculator.texts.tag-or') }}</p>
+
+      <c-input-text
+        v-model:value="text"
+        multiline
+        raw-text
+        :placeholder="t('tools.crc-calculator.texts.placeholder-paste-string-to-crc')"
+        rows="3"
+        autosize
+        autofocus
+        :label="t('tools.crc-calculator.texts.label-your-text-to-crc')"
+      />
+
+      <n-divider />
+
+      <c-select
+        v-model:value="encoding"
+        mb-4
+        :label="t('tools.crc-calculator.texts.label-digest-encoding')"
+        :options="[
+          {
+            label: t('tools.crc-calculator.texts.label-binary-base-2'),
+            value: 'Bin',
+          },
+          {
+            label: t('tools.crc-calculator.texts.label-hexadecimal-base-16'),
+            value: 'Hex',
+          },
+          {
+            label: t('tools.crc-calculator.texts.label-base64-base-64'),
+            value: 'Base64',
+          },
+          {
+            label: t('tools.crc-calculator.texts.label-base64url-base-64-with-url-safe-chars'),
+            value: 'Base64url',
+          },
+        ]"
+      />
+    </c-card>
+
+    <div mt-3 flex justify-center>
+      <c-alert v-if="status === 'error'" type="error">
+        {{ t('tools.crc-calculator.texts.tag-an-error-occured-hashing-file') }}
+      </c-alert>
+      <n-spin v-if="status === 'processing'" size="small" />
+    </div>
+
+    <c-card v-if="status === 'done'" :title="file === null ? 'CRC of text' : `CRC of ${file?.name}`">
+      <div v-for="algo in algoWasmNames" :key="algo" style="margin: 5px 0">
+        <n-input-group>
+          <n-input-group-label style="flex: 0 0 120px">
+            {{ algo.toUpperCase() }}
+          </n-input-group-label>
+          <InputCopyable :value="CRCValues[algo]" readonly />
+        </n-input-group>
+      </div>
+    </c-card>
+  </div>
+</template>

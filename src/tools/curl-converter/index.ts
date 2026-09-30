@@ -1,0 +1,13 @@
+import { defineTool } from '../tool';
+import { translate as t } from '@/plugins/i18n.plugin';
+
+export const tool = defineTool({
+  name: t('tools.curl-converter.title'),
+  path: '/curl-converter',
+  description: t('tools.curl-converter.description'),
+  keywords: ['curl', 'code', 'language', 'generator'],
+  component: () => import('./curl-converter.vue'),
+  icon: defineAsyncComponent(() => import('@vicons/tabler/es/ExternalLink')),
+  createdAt: new Date('2024-04-20'),
+  category: 'Development',
+});

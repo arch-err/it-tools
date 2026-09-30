@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { generateMeta } from '@it-tools/oggen';
-import _ from 'lodash';
+import * as _ from 'es-toolkit/compat';
 import { image, ogSchemas, twitter, website } from './og-schemas';
 import type { OGSchemaType, OGSchemaTypeElementSelect } from './OGSchemaType.type';
 import TextareaCopyable from '@/components/TextareaCopyable.vue';
@@ -8,7 +8,7 @@ import TextareaCopyable from '@/components/TextareaCopyable.vue';
 // Since type guards do not work in template
 
 const metadata = ref<{ type: string; [k: string]: any }>({
-  'type': 'website',
+  type: 'website',
   'twitter:card': 'summary_large_image',
 });
 
@@ -39,10 +39,10 @@ const sections = computed(() => {
 });
 
 const metaTags = computed(() => {
-  const twitterMeta = _.chain(metadata.value)
-    .pickBy((_value, k) => k.startsWith('twitter:'))
-    .mapKeys((_value, k) => k.replace(/^twitter:/, ''))
-    .value();
+  const twitterMeta = _.mapKeys(
+    _.pickBy(metadata.value, (_value, k) => k.startsWith('twitter:')),
+    (_value, k) => k.replace(/^twitter:/, ''),
+  );
 
   const otherMeta = _.pickBy(metadata.value, (_value, k) => !k.startsWith('twitter:'));
 
@@ -72,7 +72,7 @@ const metaTags = computed(() => {
           :show-sort-button="true"
         />
 
-        <c-select
+        <n-select
           v-else-if="type === 'select'"
           v-model:value="metadata[key]"
           w-full
@@ -83,7 +83,7 @@ const metaTags = computed(() => {
     </div>
   </div>
   <div>
-    <n-form-item label="Your meta tags">
+    <n-form-item :label="$t('tools.meta-tag-generator.texts.label-your-meta-tags')">
       <TextareaCopyable :value="metaTags" language="html" />
     </n-form-item>
   </div>

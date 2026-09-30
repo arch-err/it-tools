@@ -1,102 +1,172 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n';
 import {
   camelCase,
   capitalCase,
   constantCase,
   dotCase,
-  headerCase,
+  kebabCase,
   noCase,
-  paramCase,
   pascalCase,
   pathCase,
   sentenceCase,
   snakeCase,
+  trainCase,
 } from 'change-case';
+import { spongeCase } from 'sponge-case';
+import { swapCase } from 'swap-case';
+import { titleCase } from 'title-case';
+
 import InputCopyable from '../../components/InputCopyable.vue';
+import { useQueryParam, useQueryParamOrStorage } from '@/composable/queryParams';
+import { useValidation } from '@/composable/validation';
+import { getSupportedLanguages, toLanguageTitleCase } from './case-converter.service.ts';
 
-const baseConfig = {
-  stripRegexp: /[^A-Za-zÀ-ÖØ-öø-ÿ]+/gi,
-};
+const { t } = useI18n();
 
-const input = ref('lorem ipsum dolor sit amet');
+const cleaningRegex = useQueryParamOrStorage({
+  name: 'clean',
+  storageName: 'case-conv:cl',
+  defaultValue: '[^\\w\\d\\s]',
+});
+const cleaningRegexValidation = useValidation({
+  source: cleaningRegex,
+  rules: [
+    {
+      message: t('tools.case-converter.texts.message-invalid-cleaning-regex-0'),
+      validator: (value) => new RegExp(value),
+      getErrorMessage: (value) => {
+        const _ = new RegExp(value);
+        return '';
+      },
+    },
+  ],
+});
+
+const input = useQueryParam({ tool: 'case-conv', name: 'text', defaultValue: 'lorem ipsum dolor sit amet' });
+const language = useQueryParam({ tool: 'case-conv', name: 'lang', defaultValue: 'eng' });
+const inputCleaned = computed(() => {
+  if (!cleaningRegexValidation.isValid) {
+    return input.value.split('\n');
+  }
+  return input.value.replace(new RegExp(cleaningRegex.value, 'g'), '').split('\n');
+});
 
 const formats = computed(() => [
   {
-    label: 'Lowercase:',
-    value: input.value.toLocaleLowerCase(),
+    label: t('tools.case-converter.texts.label-lang-title-case'),
+    value: inputCleaned.value.map((s) => toLanguageTitleCase(s, language.value)),
   },
   {
-    label: 'Uppercase:',
-    value: input.value.toLocaleUpperCase(),
+    label: t('tools.case-converter.texts.label-lowercase'),
+    value: inputCleaned.value.map((s) => s.toLocaleLowerCase()),
   },
   {
-    label: 'Camelcase:',
-    value: camelCase(input.value, baseConfig),
+    label: t('tools.case-converter.texts.label-uppercase'),
+    value: inputCleaned.value.map((s) => s.toLocaleUpperCase()),
   },
   {
-    label: 'Capitalcase:',
-    value: capitalCase(input.value, baseConfig),
+    label: t('tools.case-converter.texts.label-camelcase'),
+    value: inputCleaned.value.map((s) => camelCase(s)),
   },
   {
-    label: 'Constantcase:',
-    value: constantCase(input.value, baseConfig),
+    label: t('tools.case-converter.texts.label-titlecase'),
+    value: inputCleaned.value.map((s) => titleCase(s)),
   },
   {
-    label: 'Dotcase:',
-    value: dotCase(input.value, baseConfig),
+    label: t('tools.case-converter.texts.label-capitalcase'),
+    value: inputCleaned.value.map((s) => capitalCase(s)),
   },
   {
-    label: 'Headercase:',
-    value: headerCase(input.value, baseConfig),
+    label: t('tools.case-converter.texts.label-constantcase'),
+    value: inputCleaned.value.map((s) => constantCase(s)),
   },
   {
-    label: 'Nocase:',
-    value: noCase(input.value, baseConfig),
+    label: t('tools.case-converter.texts.label-dotcase'),
+    value: inputCleaned.value.map((s) => dotCase(s)),
   },
   {
-    label: 'Paramcase:',
-    value: paramCase(input.value, baseConfig),
+    label: t('tools.case-converter.texts.label-kebab-paramcase'),
+    value: inputCleaned.value.map((s) => kebabCase(s)),
   },
   {
-    label: 'Pascalcase:',
-    value: pascalCase(input.value, baseConfig),
+    label: t('tools.case-converter.texts.label-nocase'),
+    value: inputCleaned.value.map((s) => noCase(s)),
   },
   {
-    label: 'Pathcase:',
-    value: pathCase(input.value, baseConfig),
+    label: t('tools.case-converter.texts.label-train-headercase'),
+    value: inputCleaned.value.map((s) => trainCase(s)),
   },
   {
-    label: 'Sentencecase:',
-    value: sentenceCase(input.value, baseConfig),
+    label: t('tools.case-converter.texts.label-pascalcase'),
+    value: inputCleaned.value.map((s) => pascalCase(s)),
   },
   {
-    label: 'Snakecase:',
-    value: snakeCase(input.value, baseConfig),
+    label: t('tools.case-converter.texts.label-pathcase'),
+    value: inputCleaned.value.map((s) => pathCase(s)),
   },
   {
-    label: 'Mockingcase:',
-    value: input.value
-      .split('')
-      .map((char, index) => (index % 2 === 0 ? char.toUpperCase() : char.toLowerCase()))
-      .join(''),
+    label: t('tools.case-converter.texts.label-sentencecase'),
+    value: inputCleaned.value.map((s) => sentenceCase(s)),
+  },
+  {
+    label: t('tools.case-converter.texts.label-snakecase'),
+    value: inputCleaned.value.map((s) => snakeCase(s)),
+  },
+  {
+    label: t('tools.case-converter.texts.label-mockingcase'),
+    value: inputCleaned.value.map((s) =>
+      s
+        .split('')
+        .map((char, index) => (index % 2 === 0 ? char.toUpperCase() : char.toLowerCase()))
+        .join(''),
+    ),
+  },
+  {
+    label: t('tools.case-converter.texts.label-spongecase'),
+    value: inputCleaned.value.map((s) => spongeCase(s)),
+  },
+  {
+    label: t('tools.case-converter.texts.label-swapcase'),
+    value: inputCleaned.value.map((s) => swapCase(s)),
   },
 ]);
 
 const inputLabelAlignmentConfig = {
   labelPosition: 'left',
-  labelWidth: '120px',
+  labelWidth: '125px',
   labelAlign: 'right',
-};
+} as const;
 </script>
 
 <template>
   <c-card>
     <c-input-text
       v-model:value="input"
-      label="Your string:"
-      placeholder="Your string..."
+      :label="t('tools.case-converter.texts.label-your-string')"
+      :placeholder="t('tools.case-converter.texts.placeholder-your-string')"
       raw-text
       v-bind="inputLabelAlignmentConfig"
+      multiline
+      mb-1
+    />
+
+    <c-input-text
+      v-model:value="cleaningRegex"
+      :label="t('tools.case-converter.texts.label-cleaning-regex')"
+      :placeholder="t('tools.case-converter.texts.placeholder-your-cleaning-regex')"
+      raw-text
+      v-bind="inputLabelAlignmentConfig"
+      mb-1
+    />
+
+    <c-select
+      v-model:value="language"
+      :options="getSupportedLanguages()"
+      :label="t('tools.case-converter.texts.label-language')"
+      :placeholder="t('tools.case-converter.texts.placeholder-your-language')"
+      v-bind="inputLabelAlignmentConfig"
+      mb-1
     />
 
     <div my-16px divider />
@@ -104,9 +174,10 @@ const inputLabelAlignmentConfig = {
     <InputCopyable
       v-for="format in formats"
       :key="format.label"
-      :value="format.value"
+      :value="format.value?.join('\n')"
       :label="format.label"
       v-bind="inputLabelAlignmentConfig"
+      multiline
       mb-1
     />
   </c-card>

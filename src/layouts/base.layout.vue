@@ -1,33 +1,41 @@
 <script lang="ts" setup>
+import Coffee from '~icons/tabler/coffee';
+import Home2 from '~icons/tabler/home-2';
+import Menu2 from '~icons/tabler/menu-2';
 import { NIcon, useThemeVars } from 'naive-ui';
-
-import { RouterLink } from 'vue-router';
-import { Heart, Home2, Menu2 } from '@vicons/tabler';
-
 import { storeToRefs } from 'pinia';
+import { RouterLink } from 'vue-router';
 import HeroGradient from '../assets/hero-gradient.svg?component';
 import MenuLayout from '../components/MenuLayout.vue';
 import NavbarButtons from '../components/NavbarButtons.vue';
-import { useStyleStore } from '@/stores/style.store';
-import { config } from '@/config';
-import type { ToolCategory } from '@/tools/tools.types';
-import { useToolStore } from '@/tools/tools.store';
-import { useTracker } from '@/modules/tracker/tracker.services';
 import CollapsibleToolMenu from '@/components/CollapsibleToolMenu.vue';
+import { config } from '@/config';
+import { useStyleStore } from '@/stores/style.store';
+import { useToolStore } from '@/tools/tools.store';
+import type { ToolCategory } from '@/tools/tools.types';
 
 const themeVars = useThemeVars();
 const styleStore = useStyleStore();
 const version = config.app.version;
 const commitSha = config.app.lastCommitSha.slice(0, 7);
 
-const { tracker } = useTracker();
-const { t } = useI18n();
+// Expose the navbar height so the mobile menu (MenuLayout.vue) can position
+// itself right under the always-visible top bar.
+const navbarRef = ref<HTMLElement | null>(null);
+const { height: navbarHeight } = useElementSize(navbarRef, undefined, { box: 'border-box' });
+watchEffect(() => {
+  document.documentElement.style.setProperty('--app-topbar-height', `${Math.round(navbarHeight.value)}px`);
+});
+
+const { t, locale } = useI18n();
 
 const toolStore = useToolStore();
 const { favoriteTools, toolsByCategory } = storeToRefs(toolStore);
 
 const tools = computed<ToolCategory[]>(() => [
-  ...(favoriteTools.value.length > 0 ? [{ name: t('tools.categories.favorite-tools'), components: favoriteTools.value }] : []),
+  ...(favoriteTools.value.length > 0
+    ? [{ name: t('tools.categories.favorite-tools'), components: favoriteTools.value }]
+    : []),
   ...toolsByCategory.value,
 ]);
 </script>
@@ -38,9 +46,7 @@ const tools = computed<ToolCategory[]>(() => [
       <RouterLink to="/" class="hero-wrapper">
         <HeroGradient class="gradient" />
         <div class="text-wrapper">
-          <div class="title">
-            IT - TOOLS
-          </div>
+          <div class="title">IT - TOOLS</div>
           <div class="divider" />
           <div class="subtitle">
             {{ $t('home.subtitle') }}
@@ -49,12 +55,8 @@ const tools = computed<ToolCategory[]>(() => [
       </RouterLink>
 
       <div class="sider-content">
-        <div v-if="styleStore.isSmallScreen" flex flex-col items-center>
-          <locale-selector w="90%" />
-
-          <div flex justify-center>
-            <NavbarButtons />
-          </div>
+        <div v-if="styleStore.isSmallScreen" mb-24px flex justify-center>
+          <NavbarButtons />
         </div>
 
         <CollapsibleToolMenu :tools-by-category="tools" />
@@ -63,7 +65,7 @@ const tools = computed<ToolCategory[]>(() => [
           <div>
             IT-Tools
 
-            <c-link target="_blank" rel="noopener" :href="`https://github.com/CorentinTh/it-tools/tree/v${version}`">
+            <c-link target="_blank" rel="noopener" :href="`https://github.com/sharevb/it-tools/tree/v${version}`">
               v{{ version }}
             </c-link>
 
@@ -73,7 +75,7 @@ const tools = computed<ToolCategory[]>(() => [
                 target="_blank"
                 rel="noopener"
                 type="primary"
-                :href="`https://github.com/CorentinTh/it-tools/tree/${commitSha}`"
+                :href="`https://github.com/arch-err/it-tools/tree/${commitSha}`"
               >
                 {{ commitSha }}
               </c-link>
@@ -90,7 +92,7 @@ const tools = computed<ToolCategory[]>(() => [
     </template>
 
     <template #content>
-      <div flex items-center justify-center gap-2>
+      <div ref="navbarRef" class="navbar" flex items-center justify-center gap-2>
         <c-button
           circle
           variant="text"
@@ -107,14 +109,20 @@ const tools = computed<ToolCategory[]>(() => [
         </c-tooltip>
 
         <c-tooltip :tooltip="$t('home.uiLib')" position="bottom">
-          <c-button v-if="config.app.env === 'development'" to="/c-lib" circle variant="text" :aria-label="$t('home.uiLib')">
+          <c-button
+            v-if="config.app.env === 'development'"
+            to="/c-lib"
+            circle
+            variant="text"
+            :aria-label="$t('home.uiLib')"
+          >
             <icon-mdi:brush-variant text-20px />
           </c-button>
         </c-tooltip>
 
-        <command-palette />
-
-        <locale-selector v-if="!styleStore.isSmallScreen" />
+        <Suspense>
+          <command-palette :key="locale" />
+        </Suspense>
 
         <div>
           <NavbarButtons v-if="!styleStore.isSmallScreen" />
@@ -123,19 +131,22 @@ const tools = computed<ToolCategory[]>(() => [
         <c-tooltip position="bottom" :tooltip="$t('home.support')">
           <c-button
             round
-            href="https://www.buymeacoffee.com/cthmsst"
+            href="https://www.buymeacoffee.com/sharevb"
             rel="noopener"
             target="_blank"
             class="support-button"
             :bordered="false"
-            @click="() => tracker.trackEvent({ eventName: 'Support button clicked' })"
           >
-            {{ $t('home.buyMeACoffee') }}
-            <NIcon v-if="!styleStore.isSmallScreen" :component="Heart" ml-2 />
+            <span v-if="!styleStore.isSmallScreen" mr-2>{{ $t('home.buyMeACoffee') }}</span>
+            <NIcon :component="Coffee" />
           </c-button>
         </c-tooltip>
       </div>
-      <slot />
+      <!-- Positioned wrapper so the route-change loading overlay (see router.ts)
+           can cover just the page, leaving the nav bar and menu visible. -->
+      <div class="page-content">
+        <slot />
+      </div>
     </template>
   </MenuLayout>
 </template>
@@ -173,20 +184,51 @@ const tools = computed<ToolCategory[]>(() => [
 }
 
 .sider-content {
-  padding-top: 160px;
-  padding-bottom: 200px;
+  padding-top: 20px;
+  padding-bottom: 50px;
+
+  @media (max-width: 700px) {
+    // The hero block above provides the symmetric 24px gap
+    padding-top: 0;
+  }
+}
+
+.page-content {
+  position: relative;
+}
+
+// Mobile: the top bar stays visible while scrolling, and the full-width menu
+// (see MenuLayout.vue) opens right under it.
+.navbar {
+  @media (max-width: 700px) {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    // Bleed over the scroll container's 13px padding so content scrolls
+    // under an opaque, full-width bar.
+    margin: -13px -13px 13px;
+    padding: 13px;
+    background-color: v-bind('themeVars.bodyColor');
+  }
 }
 
 .hero-wrapper {
-  position: absolute;
-  display: block;
+  position: sticky;
+  display: flex;
+  top: 0;
   left: 0;
-  width: 100%;
   z-index: 10;
+  height: 125px;
   overflow: hidden;
+  width: inherit;
 
   .gradient {
-    margin-top: -65px;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
   }
 
   .text-wrapper {
@@ -212,6 +254,29 @@ const tools = computed<ToolCategory[]>(() => [
 
     .subtitle {
       font-size: 16px;
+    }
+  }
+
+  // Mobile: seamless full-width menu — no green hero gradient, text follows
+  // the theme, and the header scrolls with the menu. Placed after the base
+  // rules above so these override them (same specificity, later source order).
+  @media (max-width: 700px) {
+    position: static;
+    height: auto;
+    // Symmetric spacing above and below the title block (sider-content's
+    // top padding is removed on mobile to keep the bottom gap equal)
+    padding: 24px 0;
+    // The hero is a router link; keep the plain-text look without the gradient
+    text-decoration: none;
+
+    .gradient {
+      display: none;
+    }
+
+    .text-wrapper {
+      position: static;
+      padding-top: 0;
+      color: v-bind('themeVars.textColor1');
     }
   }
 }

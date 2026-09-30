@@ -1,13 +1,15 @@
-import { Braces } from '@vicons/tabler';
 import { defineTool } from '../tool';
-import { translate } from '@/plugins/i18n.plugin';
+import { translate as t } from '@/plugins/i18n.plugin';
 
 export const tool = defineTool({
-  name: translate('tools.json-prettify.title'),
+  name: t('tools.json-prettify.title'),
   path: '/json-prettify',
-  description: translate('tools.json-prettify.description'),
-  keywords: ['json', 'viewer', 'prettify', 'format'],
+  description: t('tools.json-prettify.description'),
+  keywords: ['json', 'viewer', 'prettify', 'format', 'lint', 'validator', 'schema', 'repair'],
   component: () => import('./json-viewer.vue'),
-  icon: Braces,
+  icon: defineAsyncComponent(() => import('@vicons/tabler/es/Braces')),
   redirectFrom: ['/json-viewer'],
+  npmPackages: ['json5'],
+  category: 'JSON',
+  externAccessDescription: t('tools.json-prettify.externalAccess'),
 });

@@ -5,5 +5,6 @@ dist
 test-results
 
 .git
-.github
-.pnpm-store
+secrets.json
+**/secrets.json
+**/__pycache__

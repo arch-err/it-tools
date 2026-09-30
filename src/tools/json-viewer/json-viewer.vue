@@ -1,50 +1,126 @@
 <script setup lang="ts">
-import JSON5 from 'json5';
-import { useStorage } from '@vueuse/core';
+import { useI18n } from 'vue-i18n';
+import { get } from '@vueuse/core';
 import { formatJson } from './json.models';
+import { useJsonSchemaValidation } from './useJsonSchemaValidation';
 import { withDefaultOnError } from '@/utils/defaults';
 import { useValidation } from '@/composable/validation';
-import TextareaCopyable from '@/components/TextareaCopyable.vue';
+import { useITStorage, useQueryParamOrStorage } from '@/composable/queryParams';
+
+const { t } = useI18n();
 
 const inputElement = ref<HTMLElement>();
+const jsonSchemaInputElement = ref<HTMLElement>();
+const repairJsonLabel = t('tools.json-viewer.text.repair-json');
 
-const rawJson = useStorage('json-prettify:raw-json', '{"hello": "world", "foo": "bar"}');
-const indentSize = useStorage('json-prettify:indent-size', 3);
-const sortKeys = useStorage('json-prettify:sort-keys', true);
-const cleanJson = computed(() => withDefaultOnError(() => formatJson({ rawJson, indentSize, sortKeys }), ''));
+const rawJson = useITStorage('json-prettify:raw-json', '{"hello": "world", "foo": "bar"}');
+const schemaData = useITStorage('json-prettify:schema-data', '');
+const indentSize = useITStorage('json-prettify:indent-size', 3);
+const sortKeys = useITStorage('json-prettify:sort-keys', true);
+const unescapeUnicode = useITStorage('json-prettify:unescape-unicode', false);
+const unescapeJsonString = useITStorage('json-prettify:unescape-json', false);
+const repairJson = useITStorage('json-prettify:repair-json', true);
+const cleanJson = computed(() =>
+  withDefaultOnError(
+    () => formatJson({ rawJson, indentSize, sortKeys, unescapeUnicode, unescapeJsonString, repairJson }),
+    '',
+  ),
+);
 
 const rawJsonValidation = useValidation({
   source: rawJson,
   rules: [
     {
-      validator: v => v === '' || JSON5.parse(v),
-      message: 'Provided JSON is not valid.',
+      validator: (v) =>
+        v === '' ||
+        formatJson({ rawJson, indentSize: 0, sortKeys: false, unescapeUnicode, unescapeJsonString, repairJson }),
+      get message() {
+        return (
+          t('tools.json-viewer.text.provided-json-is-not-valid') +
+          (!get(repairJson) ? t('tools.json-viewer.text.try-again-with-repairjsonlabel', [repairJsonLabel]) : '')
+        );
+      },
     },
   ],
+  watch: [repairJson, unescapeUnicode, unescapeJsonString],
 });
+
+const schemaUrl = useQueryParamOrStorage<string>({
+  name: 'schema',
+  storageName: 'json-prettify:schema',
+  defaultValue: '',
+});
+const { schemas, errors: validationErrors } = useJsonSchemaValidation({ json: rawJson, schemaUrl, schemaData });
 </script>
 
 <template>
-  <div style="flex: 0 0 100%">
-    <div style="margin: 0 auto; max-width: 600px" flex justify-center gap-3>
-      <n-form-item label="Sort keys :" label-placement="left" label-width="100">
-        <n-switch v-model:value="sortKeys" />
-      </n-form-item>
-      <n-form-item label="Indent size :" label-placement="left" label-width="100" :show-feedback="false">
-        <n-input-number v-model:value="indentSize" min="0" max="10" style="width: 100px" />
-      </n-form-item>
-    </div>
-  </div>
+  <n-space justify="center">
+    <n-form-item :label="t('tools.json-viewer.texts.label-sort-keys')" label-placement="left" label-width="100">
+      <n-switch v-model:value="sortKeys" />
+    </n-form-item>
+    <n-form-item :label="t('tools.json-viewer.texts.label-unescape-unicode')" label-placement="left" label-width="150">
+      <n-switch v-model:value="unescapeUnicode" />
+    </n-form-item>
+    <n-form-item
+      :label="t('tools.json-viewer.texts.label-unescape-json-string')"
+      label-placement="left"
+      label-width="180"
+    >
+      <n-switch v-model:value="unescapeJsonString" />
+    </n-form-item>
+    <n-form-item
+      :label="t('tools.json-viewer.texts.label-indent-size')"
+      label-placement="left"
+      label-width="100"
+      :show-feedback="false"
+    >
+      <n-input-number-i18n v-model:value="indentSize" min="0" max="10" style="width: 100px" />
+    </n-form-item>
+    <n-form-item :label="`${repairJsonLabel} :`" label-placement="left" label-width="110">
+      <n-switch v-model:value="repairJson" />
+    </n-form-item>
+  </n-space>
 
   <n-form-item
-    label="Your raw JSON"
+    :label="t('tools.json-viewer.texts.label-json-schema')"
+    label-placement="left"
+    label-width="130px"
+    label-align="right"
+  >
+    <n-select
+      v-model:value="schemaUrl"
+      :options="[
+        { label: t('tools.json-viewer.texts.label-no-validation'), value: '' },
+        { label: t('tools.json-viewer.texts.label-custom'), value: 'custom' },
+        ...schemas.map((s) => ({ label: `${s.name} / ${s.description}`, value: s.url })),
+      ]"
+      filterable
+      mb-4
+    />
+  </n-form-item>
+  <c-input-text
+    v-if="schemaUrl === 'custom'"
+    ref="jsonSchemaInputElement"
+    v-model:value="schemaData"
+    :placeholder="t('tools.json-viewer.texts.placeholder-paste-your-json-schema-here')"
+    rows="20"
+    multiline
+    autocomplete="off"
+    autocorrect="off"
+    autocapitalize="off"
+    spellcheck="false"
+    monospace
+  />
+
+  <n-form-item
+    :label="t('tools.json-viewer.texts.label-your-raw-json')"
     :feedback="rawJsonValidation.message"
     :validation-status="rawJsonValidation.status"
   >
     <c-input-text
       ref="inputElement"
       v-model:value="rawJson"
-      placeholder="Paste your raw JSON here..."
+      :placeholder="t('tools.json-viewer.texts.placeholder-paste-your-raw-json-here')"
       rows="20"
       multiline
       autocomplete="off"
@@ -54,9 +130,28 @@ const rawJsonValidation = useValidation({
       monospace
     />
   </n-form-item>
-  <n-form-item label="Prettified version of your JSON">
-    <TextareaCopyable :value="cleanJson" language="json" :follow-height-of="inputElement" />
-  </n-form-item>
+
+  <div v-if="validationErrors.length > 0" mb-2 mt-2>
+    <n-alert :title="t('tools.json-viewer.texts.title-schema-validation-errors')" type="error">
+      <ul v-for="error in validationErrors" :key="error">
+        <li>{{ error }}</li>
+      </ul>
+    </n-alert>
+  </div>
+
+  <n-tabs type="card">
+    <n-tab-pane name="pretty" :tab="t('tools.json-viewer.texts.label-prettified-version-of-your-json')">
+      <textarea-copyable
+        :value="cleanJson"
+        language="json"
+        :follow-height-of="inputElement"
+        download-file-name="output.json"
+      />
+    </n-tab-pane>
+    <n-tab-pane name="editable" :tab="t('tools.json-viewer.texts.label-viewer')">
+      <CodeBlockCopyable :value="cleanJson" language="json" download-file-name="output.json" />
+    </n-tab-pane>
+  </n-tabs>
 </template>
 
 <style lang="less" scoped>

@@ -1,0 +1,13 @@
+import { defineTool } from '../tool';
+import { translate as t } from '@/plugins/i18n.plugin';
+
+export const tool = defineTool({
+  name: t('tools.geo-distance-calculator.title'),
+  path: '/geo-distance-calculator',
+  description: t('tools.geo-distance-calculator.description'),
+  keywords: ['geo', 'distance', 'calculator'],
+  component: () => import('./geo-distance-calculator.vue'),
+  icon: defineAsyncComponent(() => import('@vicons/tabler/es/WorldLatitude')),
+  createdAt: new Date('2025-01-01'),
+  category: 'Measurement',
+});

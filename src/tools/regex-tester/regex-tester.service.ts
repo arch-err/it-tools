@@ -1,18 +1,18 @@
 interface RegExpGroupIndices {
-  [name: string]: [number, number]
+  [name: string]: [number, number];
 }
 interface RegExpIndices extends Array<[number, number]> {
-  groups: RegExpGroupIndices
+  groups: RegExpGroupIndices;
 }
 interface RegExpExecArrayWithIndices extends RegExpExecArray {
-  indices: RegExpIndices
+  indices: RegExpIndices;
 }
 interface GroupCapture {
-  name: string
-  value: string
-  start: number
-  end: number
-};
+  name: string;
+  value: string;
+  start: number;
+  end: number;
+}
 
 export function matchRegex(regex: string, text: string, flags: string) {
   // if (regex === '' || text === '') {
@@ -31,21 +31,23 @@ export function matchRegex(regex: string, text: string, flags: string) {
     const captures: Array<GroupCapture> = [];
     Object.entries(match).forEach(([captureName, captureValue]) => {
       if (captureName !== '0' && captureName.match(/\d+/)) {
+        const captureIndices = indices[Number(captureName)] || [-1, -1];
         captures.push({
           name: captureName,
           value: captureValue,
-          start: indices[Number(captureName)][0],
-          end: indices[Number(captureName)][1],
+          start: captureIndices[0],
+          end: captureIndices[1],
         });
       }
     });
     const groups: Array<GroupCapture> = [];
     Object.entries(match.groups || {}).forEach(([groupName, groupValue]) => {
+      const groupIndices = indices.groups[groupName] || [-1, -1];
       groups.push({
         name: groupName,
         value: groupValue,
-        start: indices.groups[groupName][0],
-        end: indices.groups[groupName][1],
+        start: groupIndices[0],
+        end: groupIndices[1],
       });
     });
     results.push({

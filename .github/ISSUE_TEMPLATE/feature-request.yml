@@ -25,7 +25,7 @@ body:
     id: feature-description
     attributes:
       label: Clear and concise description of the feature you are proposing
-      description: A clear and concise description of what the feature is.
+      description: A clear and concise description of what the feature is, in PLAIN ENGLISH ONLY.
       placeholder: 'Example: a token generator tool'
     validations:
       required: true
@@ -33,7 +33,7 @@ body:
   - type: textarea
     id: alternative
     attributes:
-      label: Is their example of this tool in the wild?
+      label: Is there example of this tool in the wild?
       description: Provide link to already existing tool (like websites, apps, cli, ...) or npm packages that could be used or provide inspiration for the feature.
 
   - type: textarea
@@ -53,4 +53,6 @@ body:
         - label: Check that there isn't already an issue that request the same feature to avoid creating a duplicate.
           required: true
         - label: Check that the feature can be implemented in a client side only app (IT-Tools is client side only, no server).
+          required: true
+        - label: Everything is written in PLAIN ENGLISH
           required: true

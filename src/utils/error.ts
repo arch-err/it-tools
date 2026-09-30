@@ -1,4 +1,4 @@
-import _ from 'lodash';
+import * as _ from 'es-toolkit/compat';
 
 export { getErrorMessageIfThrows };
 
@@ -6,8 +6,7 @@ function getErrorMessageIfThrows(cb: () => unknown) {
   try {
     cb();
     return undefined;
-  }
-  catch (err) {
+  } catch (err) {
     if (_.isString(err)) {
       return err;
     }

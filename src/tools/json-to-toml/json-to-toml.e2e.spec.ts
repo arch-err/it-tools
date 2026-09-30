@@ -10,7 +10,8 @@ test.describe('Tool - JSON to TOML', () => {
   });
 
   test('JSON is parsed and outputs clean TOML', async ({ page }) => {
-    await page.getByTestId('input').fill(`
+    await page.getByTestId('input').fill(
+      `
 {
    "foo": "bar",
    "list": {
@@ -20,7 +21,8 @@ test.describe('Tool - JSON to TOML', () => {
       }
    }
 }
-    `.trim());
+    `.trim(),
+    );
 
     const generatedJson = await page.getByTestId('area-content').innerText();
 
@@ -31,8 +33,8 @@ foo = "bar"
 [list]
 name = "item"
 
-  [list.another]
-  key = "value"
+[list.another]
+key = "value"
    `.trim(),
     );
   });

@@ -1,17 +1,23 @@
 import { type MaybeRef, get } from '@vueuse/core';
-import Fuse from 'fuse.js';
+import Fuse, { type IFuseOptions } from 'fuse.js';
 import { computed } from 'vue';
 
 export { useFuzzySearch };
 
+/**
+ * @deprecated This composable is deprecated and will be removed in a future version.
+ * Use {@link useFlexSearch} instead.
+ */
 function useFuzzySearch<Data>({
   search,
   data,
   options = {},
+  limit = -1,
 }: {
-  search: MaybeRef<string>
-  data: Data[]
-  options?: Fuse.IFuseOptions<Data> & { filterEmpty?: boolean }
+  search: MaybeRef<string>;
+  data: Data[];
+  options?: IFuseOptions<Data> & { filterEmpty?: boolean };
+  limit?: number;
 }) {
   const fuse = new Fuse(data, options);
   const filterEmpty = options.filterEmpty ?? true;
@@ -23,7 +29,7 @@ function useFuzzySearch<Data>({
       return data;
     }
 
-    return fuse.search(query).map(({ item }) => item);
+    return fuse.search(query, { limit }).map(({ item }) => item);
   });
 
   return { searchResult };

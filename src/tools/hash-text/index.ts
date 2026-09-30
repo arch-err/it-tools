@@ -1,11 +1,11 @@
-import { EyeOff } from '@vicons/tabler';
 import { defineTool } from '../tool';
-import { translate } from '@/plugins/i18n.plugin';
+import { translate as t } from '@/plugins/i18n.plugin';
 
 export const tool = defineTool({
-  name: translate('tools.hash-text.title'),
+  name: t('tools.hash-text.title'),
   path: '/hash-text',
-  description: translate('tools.hash-text.description'),
+  description:
+    'Hash a text string using the function you need : MD5, SHA1, SHA256, SHA224, SHA512, SHA384, SHA3, RIPEMD160, ADLER32, CRC32, CRC32C, BLAKE, KECCAK, XXHASH, SM3, WHIRLPOOL or Argon2(i/d/id)',
   keywords: [
     'hash',
     'digest',
@@ -20,8 +20,27 @@ export const tool = defineTool({
     'SHA384',
     'SHA3',
     'RIPEMD160',
+    'ADLER32',
+    'BLAKE2B',
+    'BLAKE2S',
+    'BLAKE3',
+    'CRC32',
+    'CRC32C',
+    'KECCAK',
+    'PBKDF2',
+    'SM3',
+    'WHIRLPOOL',
+    'XXHASH128',
+    'XXHASH3',
+    'XXHASH32',
+    'XXHASH64',
+    'Argon2',
+    'Argon2i',
+    'Argon2d',
+    'Argon2id',
   ],
   component: () => import('./hash-text.vue'),
-  icon: EyeOff,
+  icon: defineAsyncComponent(() => import('@vicons/tabler/es/EyeOff')),
   redirectFrom: ['/hash'],
+  category: 'Crypto',
 });

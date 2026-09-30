@@ -1,4 +1,4 @@
-import _ from 'lodash';
+import { translate as t } from '@/plugins/i18n.plugin';
 
 export { getPasswordCrackTimeEstimation, getCharsetLength };
 
@@ -11,28 +11,69 @@ function prettifyExponentialNotation(exponentialNotation: number) {
 
 function getHumanFriendlyDuration({ seconds }: { seconds: number }) {
   if (seconds <= 0.001) {
-    return 'Instantly';
+    return t('tools.password-strength-analyser.service.text.instantly');
   }
 
   if (seconds <= 1) {
-    return 'Less than a second';
+    return t('tools.password-strength-analyser.service.text.less-than-a-second');
   }
 
   const timeUnits = [
-    { unit: 'millenium', secondsInUnit: 31536000000, format: prettifyExponentialNotation, plural: 'millennia' },
-    { unit: 'century', secondsInUnit: 3153600000, plural: 'centuries' },
-    { unit: 'decade', secondsInUnit: 315360000, plural: 'decades' },
-    { unit: 'year', secondsInUnit: 31536000, plural: 'years' },
-    { unit: 'month', secondsInUnit: 2592000, plural: 'months' },
-    { unit: 'week', secondsInUnit: 604800, plural: 'weeks' },
-    { unit: 'day', secondsInUnit: 86400, plural: 'days' },
-    { unit: 'hour', secondsInUnit: 3600, plural: 'hours' },
-    { unit: 'minute', secondsInUnit: 60, plural: 'minutes' },
-    { unit: 'second', secondsInUnit: 1, plural: 'seconds' },
+    {
+      unit: t('tools.password-strength-analyser.service.text.millenium'),
+      secondsInUnit: 31536000000,
+      format: prettifyExponentialNotation,
+      plural: t('tools.password-strength-analyser.service.text.millennia'),
+    },
+    {
+      unit: t('tools.password-strength-analyser.service.text.century'),
+      secondsInUnit: 3153600000,
+      plural: t('tools.password-strength-analyser.service.text.centuries'),
+    },
+    {
+      unit: t('tools.password-strength-analyser.service.text.decade'),
+      secondsInUnit: 315360000,
+      plural: t('tools.password-strength-analyser.service.text.decades'),
+    },
+    {
+      unit: t('tools.password-strength-analyser.service.text.year'),
+      secondsInUnit: 31536000,
+      plural: t('tools.password-strength-analyser.service.text.years'),
+    },
+    {
+      unit: t('tools.password-strength-analyser.service.text.month'),
+      secondsInUnit: 2592000,
+      plural: t('tools.password-strength-analyser.service.text.months'),
+    },
+    {
+      unit: t('tools.password-strength-analyser.service.text.week'),
+      secondsInUnit: 604800,
+      plural: t('tools.password-strength-analyser.service.text.weeks'),
+    },
+    {
+      unit: t('tools.password-strength-analyser.service.text.day'),
+      secondsInUnit: 86400,
+      plural: t('tools.password-strength-analyser.service.text.days'),
+    },
+    {
+      unit: t('tools.password-strength-analyser.service.text.hour'),
+      secondsInUnit: 3600,
+      plural: t('tools.password-strength-analyser.service.text.hours'),
+    },
+    {
+      unit: t('tools.password-strength-analyser.service.text.minute'),
+      secondsInUnit: 60,
+      plural: t('tools.password-strength-analyser.service.text.minutes'),
+    },
+    {
+      unit: t('tools.password-strength-analyser.service.text.second'),
+      secondsInUnit: 1,
+      plural: t('tools.password-strength-analyser.service.text.seconds'),
+    },
   ];
 
-  return _.chain(timeUnits)
-    .map(({ unit, secondsInUnit, plural, format = _.identity }) => {
+  return timeUnits
+    .map(({ unit, secondsInUnit, plural, format = (value: number) => value }) => {
       const quantity = Math.floor(seconds / secondsInUnit);
       seconds %= secondsInUnit;
 
@@ -43,13 +84,18 @@ function getHumanFriendlyDuration({ seconds }: { seconds: number }) {
       const formattedQuantity = format(quantity);
       return `${formattedQuantity} ${quantity > 1 ? plural : unit}`;
     })
-    .compact()
-    .take(2)
-    .join(', ')
-    .value();
+    .filter((part): part is string => Boolean(part))
+    .slice(0, 2)
+    .join(', ');
 }
 
-function getPasswordCrackTimeEstimation({ password, guessesPerSecond = 1e9 }: { password: string; guessesPerSecond?: number }) {
+function getPasswordCrackTimeEstimation({
+  password,
+  guessesPerSecond = 1e9,
+}: {
+  password: string;
+  guessesPerSecond?: number;
+}) {
   const charsetLength = getCharsetLength({ password });
   const passwordLength = password.length;
 

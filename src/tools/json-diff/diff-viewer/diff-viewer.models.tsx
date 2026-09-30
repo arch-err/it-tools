@@ -1,4 +1,3 @@
-import _ from 'lodash';
 import type { ArrayDifference, Difference, ObjectDifference } from '../json-diff.types';
 import { useCopy } from '@/composable/copy';
 
@@ -72,13 +71,13 @@ function ChildrenViewer({
   showKeys,
   showChildrenKeys = true,
 }: {
-  diff: ArrayDifference | ObjectDifference
-  showKeys: boolean
-  showChildrenKeys?: boolean
-  openTag: string
-  closeTag: string
+  diff: ArrayDifference | ObjectDifference;
+  showKeys: boolean;
+  showChildrenKeys?: boolean;
+  openTag: string;
+  closeTag: string;
 }) {
-  const { children, key, status, type } = diff;
+  const { children, key, status, type, oldValue } = diff;
 
   return (
     <li>
@@ -90,20 +89,21 @@ function ChildrenViewer({
           </>
         )}
 
-        {openTag}
-        {children.length > 0 && <ul>{children.map(diff => DiffViewer({ diff, showKeys: showChildrenKeys }))}</ul>}
-        {`${closeTag},`}
+        {children.length === 0 && status === 'removed' && Value({ value: oldValue, status: 'removed' })}
+        {children.length > 0 && openTag}
+        {children.length > 0 && <ul>{children.map((diff) => DiffViewer({ diff, showKeys: showChildrenKeys }))}</ul>}
+        {children.length > 0 && `${closeTag},`}
       </div>
     </li>
   );
 }
 
 function formatValue(value: unknown) {
-  if (_.isNull(value)) {
+  if (value === null) {
     return 'null';
   }
 
-  return JSON.stringify(value);
+  return JSON.stringify(value, null, 8);
 }
 
 function Value({ value, status }: { value: unknown; status: string }) {
@@ -112,7 +112,7 @@ function Value({ value, status }: { value: unknown; status: string }) {
   const { copy } = useCopy({ source: formatedValue });
 
   return (
-    <span class={['value', status]} onClick={() => copy()}>
+    <span class={['value', status]} style="word-break: break-word; white-space: pre-wrap" onClick={() => copy()}>
       {formatedValue}
     </span>
   );

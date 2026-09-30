@@ -18,8 +18,6 @@ coverage
 /cypress/screenshots/
 
 # Editor directories and files
-.vscode/*
-!.vscode/extensions.json
 .idea
 *.suo
 *.ntvs*
@@ -33,6 +31,26 @@ coverage
 /playwright/.cache/
 # Webkit with playwright creates a salt file
 salt
-# Python helper bytecode and separately exported credentials
-__pycache__/
+# WSL can create Zone.Identifier
+*:Zone.Identifier
+.vercel
+
+components.d.ts
+
+# .vscode specific files: Include known configuration files, but ignore everything else inside the folder 
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/*.code-snippets
+!*.code-workspace
+
+# Ignore build or packaged VS Code extensions
+*.vsix
+*.tsbuildinfo
+stats.html
+
+# Local Secret exports and Python bytecode.
 secrets.json
+__pycache__/

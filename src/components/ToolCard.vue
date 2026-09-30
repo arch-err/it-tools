@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import World from '~icons/tabler/world';
 import { useThemeVars } from 'naive-ui';
 import FavoriteButton from './FavoriteButton.vue';
 import type { Tool } from '@/tools/tools.types';
@@ -9,7 +10,7 @@ const theme = useThemeVars();
 </script>
 
 <template>
-  <router-link :to="tool.path" class="decoration-none">
+  <router-link :to="tool.path" class="it-tool-link decoration-none">
     <c-card class="h-full transition transition-duration-0.5s !border-2px !hover:border-primary">
       <div flex items-center justify-between>
         <n-icon class="text-neutral-400 dark:text-neutral-600" size="40" :component="tool.icon" />
@@ -31,6 +32,7 @@ const theme = useThemeVars();
 
       <div class="truncat my-5px text-lg text-black dark:text-white">
         {{ tool.name }}
+        <World v-if="tool.externAccessDescription" class="tool-privacy-icon" />
       </div>
 
       <div class="line-clamp-2 text-neutral-500 dark:text-neutral-400">
@@ -39,3 +41,10 @@ const theme = useThemeVars();
     </c-card>
   </router-link>
 </template>
+
+<style lang="css" scoped>
+.tool-privacy-icon {
+  display: inline-block;
+  height: 0.9em;
+}
+</style>

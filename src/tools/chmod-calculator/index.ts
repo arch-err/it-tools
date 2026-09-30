@@ -1,11 +1,10 @@
-import { FileInvoice } from '@vicons/tabler';
 import { defineTool } from '../tool';
-import { translate } from '@/plugins/i18n.plugin';
+import { translate as t } from '@/plugins/i18n.plugin';
 
 export const tool = defineTool({
-  name: translate('tools.chmod-calculator.title'),
+  name: t('tools.chmod-calculator.title'),
   path: '/chmod-calculator',
-  description: translate('tools.chmod-calculator.description'),
+  description: t('tools.chmod-calculator.description'),
   keywords: [
     'chmod',
     'calculator',
@@ -17,7 +16,9 @@ export const tool = defineTool({
     'recursive',
     'generator',
     'octal',
+    'umask',
   ],
   component: () => import('./chmod-calculator.vue'),
-  icon: FileInvoice,
+  icon: defineAsyncComponent(() => import('@vicons/tabler/es/FileInvoice')),
+  category: 'Network',
 });

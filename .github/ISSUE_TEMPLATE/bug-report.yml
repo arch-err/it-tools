@@ -2,7 +2,7 @@ name: 🐞 Bug Report
 description: File a bug report.
 labels: ['bug', 'triage']
 assignees:
-  - CorentinTh
+  - sharevb
 body:
   - type: markdown
     attributes:
@@ -13,7 +13,7 @@ body:
     id: bug-description
     attributes:
       label: Describe the bug
-      description: A clear and concise description of what the bug is. If you intend to submit a PR for this issue, tell us in the description. Thanks!
+      description: A clear and concise description, in PLAIN ENGLISH ONLY, of what the bug is. If you intend to submit a PR for this issue, tell us in the description. Thanks!
       placeholder: Bug description
     validations:
       required: true
@@ -41,7 +41,7 @@ body:
     attributes:
       label: Where did you encounter the bug?
       options:
-        - Public app (it-tools.tech)
+        - Public app (sharevb-it-tools.vercel.app)
         - A self hosted
         - Other (installations, docker, etc.)
     validations:

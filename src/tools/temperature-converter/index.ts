@@ -1,11 +1,10 @@
-import { Temperature } from '@vicons/tabler';
 import { defineTool } from '../tool';
-import { translate } from '@/plugins/i18n.plugin';
+import { translate as t } from '@/plugins/i18n.plugin';
 
 export const tool = defineTool({
-  name: translate('tools.temperature-converter.title'),
+  name: t('tools.temperature-converter.title'),
   path: '/temperature-converter',
-  description: translate('tools.temperature-converter.description'),
+  description: t('tools.temperature-converter.description'),
   keywords: [
     'temperature',
     'converter',
@@ -18,7 +17,9 @@ export const tool = defineTool({
     'Newton',
     'Réaumur',
     'Rømer',
+    'units',
   ],
   component: () => import('./temperature-converter.vue'),
-  icon: Temperature,
+  icon: defineAsyncComponent(() => import('@vicons/tabler/es/Temperature')),
+  category: 'Physics',
 });

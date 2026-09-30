@@ -1,6 +1,84 @@
 {
-  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "configMigration": true,
+  "branchConcurrentLimit": 5,
+  "prHourlyLimit": 25,
+  "recreateWhen": "never",
+  "prCreation": "immediate",
+  "timezone": "Europe/Paris",
+  "schedule": [
+    "* 0-3 * * *"
+  ],
+  "automergeSchedule": [
+    "* 0-3 * * *"
+  ],
   "extends": [
-    "config:base"
+    "config:recommended",
+    "docker:pinDigests",
+    "helpers:pinGitHubActionDigests",
+    ":pinDevDependencies"
+  ],
+  "packageRules": [
+    {
+      "groupName": "TypeScript toolchain",
+      "matchPackageNames": ["typescript", "vue-tsc", "oxlint-tsgolint"],
+      "matchUpdateTypes": ["major", "minor", "patch"]
+    },
+    {
+      "groupName": "Vue ecosystem",
+      "matchPackageNames": [
+        "vue",
+        "@vue/compiler-sfc",
+        "@vue/runtime-dom",
+        "@vue/test-utils",
+        "@vue/tsconfig"
+      ],
+      "matchUpdateTypes": ["major", "minor", "patch"]
+    },
+    {
+      "groupName": "Vite ecosystem",
+      "matchPackageNames": [
+        "vite",
+        "@vitejs/plugin-vue",
+        "@vitejs/plugin-vue-jsx",
+        "vite-plugin-pwa",
+        "vite-plugin-vue-markdown",
+        "vite-svg-loader"
+      ],
+      "matchUpdateTypes": ["major", "minor", "patch"]
+    },
+    {
+      "groupName": "UnoCSS ecosystem",
+      "matchPackageNames": [
+        "unocss",
+        "unocss-preset-scrollbar"
+      ],
+      "matchUpdateTypes": ["major", "minor", "patch"]
+    },
+    {
+      "groupName": "Unplugin ecosystem",
+      "matchPackageNames": [
+        "unplugin-auto-import",
+        "unplugin-icons",
+        "unplugin-vue-components"
+      ],
+      "matchUpdateTypes": ["major", "minor", "patch"]
+    },
+    {
+      "groupName": "Vicons",
+      "matchPackageNames": ["@vicons/material", "@vicons/tabler"],
+      "matchUpdateTypes": ["major", "minor", "patch"]
+    },
+    {
+      "groupName": "VueUse",
+      "matchPackageNames": ["@vueuse/core", "@vueuse/head", "@vueuse/router"],
+      "matchUpdateTypes": ["major", "minor", "patch"]
+    },
+    {
+      "groupName": "Type packages with their dependencies",
+      "matchDepTypes": ["devDependencies"],
+      "groupSlug": "types",
+      "automerge": true,
+      "matchPackageNames": ["/^@types//"]
+    }
   ]
 }
