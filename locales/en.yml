@@ -58,6 +58,18 @@ toolCard:
 search:
   label: Search
 tools:
+  kubernetes-to-compose:
+    title: Kubernetes to Compose
+    description: Convert Kubernetes manifests into Compose with companion files and conversion notes.
+  kubernetes-to-quadlet:
+    title: Kubernetes to Quadlet
+    description: Convert Kubernetes manifests into Quadlet with companion files and conversion notes.
+  kubernetes-to-docker-run:
+    title: Kubernetes to Docker run
+    description: Convert Kubernetes manifests into Docker run with companion files and conversion notes.
+  kubernetes-to-podman-run:
+    title: Kubernetes to Podman run
+    description: Convert Kubernetes manifests into Podman run with companion files and conversion notes.
   categories:
     favorite-tools: 'Your favorite tools'
     crypto: Crypto

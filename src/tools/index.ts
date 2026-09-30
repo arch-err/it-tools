@@ -41,6 +41,10 @@ import { tool as benchmarkBuilder } from './benchmark-builder';
 import { tool as userAgentParser } from './user-agent-parser';
 import { tool as ipv4SubnetCalculator } from './ipv4-subnet-calculator';
 import { tool as dockerRunToDockerComposeConverter } from './docker-run-to-docker-compose-converter';
+import { tool as kubernetesToCompose } from './kubernetes-to-compose';
+import { tool as kubernetesToQuadlet } from './kubernetes-to-quadlet';
+import { tool as kubernetesToDockerRun } from './kubernetes-to-docker-run';
+import { tool as kubernetesToPodmanRun } from './kubernetes-to-podman-run';
 import { tool as htmlWysiwygEditor } from './html-wysiwyg-editor';
 import { tool as rsaKeyPairGenerator } from './rsa-key-pair-generator';
 import { tool as textToNatoAlphabet } from './text-to-nato-alphabet';
@@ -155,6 +159,10 @@ export const toolsByCategory: ToolCategory[] = [
       sqlPrettify,
       chmodCalculator,
       dockerRunToDockerComposeConverter,
+      kubernetesToCompose,
+      kubernetesToQuadlet,
+      kubernetesToDockerRun,
+      kubernetesToPodmanRun,
       xmlFormatter,
       yamlViewer,
       emailNormalizer,

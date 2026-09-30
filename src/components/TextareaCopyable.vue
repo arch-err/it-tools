@@ -7,6 +7,7 @@ import sqlHljs from 'highlight.js/lib/languages/sql';
 import xmlHljs from 'highlight.js/lib/languages/xml';
 import yamlHljs from 'highlight.js/lib/languages/yaml';
 import iniHljs from 'highlight.js/lib/languages/ini';
+import bashHljs from 'highlight.js/lib/languages/bash';
 import markdownHljs from 'highlight.js/lib/languages/markdown';
 import { useCopy } from '@/composable/copy';
 
@@ -31,6 +32,7 @@ hljs.registerLanguage('html', xmlHljs);
 hljs.registerLanguage('xml', xmlHljs);
 hljs.registerLanguage('yaml', yamlHljs);
 hljs.registerLanguage('toml', iniHljs);
+hljs.registerLanguage('bash', bashHljs);
 hljs.registerLanguage('markdown', markdownHljs);
 
 const { value, language, followHeightOf, copyPlacement, copyMessage } = toRefs(props);

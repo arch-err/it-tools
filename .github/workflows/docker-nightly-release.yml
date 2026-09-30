@@ -7,6 +7,7 @@ on:
 
 jobs:
   check_date:
+    if: github.repository == 'CorentinTh/it-tools'
     runs-on: ubuntu-latest
     name: Check latest commit
     outputs:

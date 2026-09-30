@@ -3,3 +3,7 @@ playwright-report
 coverage
 dist
 test-results
+
+.git
+.github
+.pnpm-store

@@ -1,0 +1,76 @@
+# Kubernetes container converters
+
+Four tools share a browser-only manifest parser:
+
+- `/kubernetes-to-compose`
+- `/kubernetes-to-quadlet`
+- `/kubernetes-to-docker-run`
+- `/kubernetes-to-podman-run`
+
+Paste rendered YAML (including multi-document input) or Kubernetes JSON/List
+output. Helm rendering and cluster access are outside the converter's scope.
+Input remains in memory when switching outputs; it is not saved to localStorage.
+
+## Supported mappings
+
+| Kubernetes input | Local output |
+| --- | --- |
+| Pod, Deployment, ReplicaSet, StatefulSet, DaemonSet, Job, CronJob | One Pod instance with its containers |
+| Image, command, args, workingDir | Container image and process configuration |
+| Literal env, ConfigMap envFrom/key references | Container environment |
+| Secret/missing env references | Host environment references and explicit notes; no secret values exported |
+| Service selectors and named target ports | Network aliases; service-to-target port differences produce notes |
+| hostPort and nodePort | Explicit published ports, defaulting to loopback |
+| ConfigMap mounts/items/subPath | Read-only file mounts and companion files |
+| PVC and StatefulSet volumeClaimTemplates | Empty local named volumes; existing data is not migrated |
+| emptyDir | Shared named volume with a lifecycle/medium warning |
+| hostPath | Host bind mount |
+| CPU/memory limits | Container limits |
+| UID/GID, capabilities, privileged, read-only, no-new-privileges | Container security settings |
+| restartPolicy | Runtime/systemd restart policy |
+| hostNetwork | Host networking |
+
+Compose and Docker run share each Pod's primary container network namespace with
+its sidecars. Quadlet and Podman run create actual Podman pods on a shared
+network. Recreating a Docker primary container can require recreating sidecars
+that share its network namespace.
+
+Unsupported kinds and Pod/container fields produce conversion notes. Init
+containers, probes, scheduling, ingress/network policies, storage provisioning,
+projected/CSI/Secret mounts and cluster controllers are not reproduced. Service
+ports are not proxied: clients must use the target container port when it differs
+from the original service port. Namespace-scoped short Service aliases can be
+ambiguous on the shared local network; use qualified names when necessary.
+
+ZIP downloads contain every generated file and a README with conversion notes.
+Run scripts create containers but are not idempotent redeployment scripts; remove
+existing containers/pods before rerunning them. Quadlets target rootless Podman
+5+ and require all units and companion files in the same extracted directory.
+The converter never executes the generated commands or starts workloads.
+
+## Development
+
+Use the repository's pnpm commands: `pnpm dev`, `pnpm typecheck`, `pnpm build`,
+and `pnpm test:unit --run`. Converter behavior tests live beside the shared
+parser. Validate generated Compose with `docker compose config`, shell scripts
+with `bash -n`, and Quadlets with the Podman systemd generator's `--user --dryrun`
+mode before changing renderers. Inspect generator diagnostics as well as its
+exit code: conversion errors can be printed even when the process exits zero.
+
+Primary format references:
+
+- https://docs.docker.com/reference/compose-file/services/
+- https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html
+- https://kubernetes.io/docs/concepts/workloads/pods/
+
+## Container publishing
+
+The fork's `CI and container` workflow runs lint, unit tests, type checking and
+an application build on pull requests and pushes to `main`. After checks pass,
+main builds publish amd64/arm64 images to `ghcr.io/arch-err/it-tools` with a full
+`sha-<commit>` tag and `latest`. Publishing uses `GITHUB_TOKEN` with job-scoped
+`packages: write`; Docker Hub credentials are not required. Inherited upstream
+nightly/release jobs are guarded so this fork cannot publish upstream images.
+
+The package must be public for anonymous cluster pulls. The public cluster
+instance uses a pinned image digest; future builds do not silently upgrade it.
