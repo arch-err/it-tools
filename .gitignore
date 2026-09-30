@@ -33,3 +33,6 @@ coverage
 /playwright/.cache/
 # Webkit with playwright creates a salt file
 salt
+# Python helper bytecode and separately exported credentials
+__pycache__/
+secrets.json

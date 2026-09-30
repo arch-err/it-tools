@@ -26,6 +26,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm test:unit --run
+      - run: python3 -m unittest discover -s src/tools/kubernetes-converter -p '*_test.py'
       - run: pnpm typecheck
       - run: pnpm build
 

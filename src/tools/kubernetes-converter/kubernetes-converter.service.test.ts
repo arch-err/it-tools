@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
-import { type ConversionTarget, convertKubernetes } from './kubernetes-converter.service';
+import harborManifest from '../../../fixtures/harbor/rendered.yaml?raw';
+import { type ConversionTarget, convertKubernetes, exportKubernetesSecrets } from './kubernetes-converter.service';
 import { exampleManifest, multiContainerExample } from './kubernetes-converter.examples';
 
 const targets: ConversionTarget[] = ['compose', 'quadlet', 'docker-run', 'podman-run'];
@@ -156,5 +157,79 @@ describe('Kubernetes manifest conversion', () => {
   it('rejects duplicate host bindings across workloads', () => {
     const input = [pod({ containers: [{ name: 'app', image: 'nginx', ports: [{ hostPort: 8080, containerPort: 80 }] }] }, 'one'), pod({ containers: [{ name: 'app', image: 'nginx', ports: [{ hostPort: 8080, containerPort: 80 }] }] }, 'two')].join('\n---\n');
     expect(convertKubernetes(input, 'compose').errors[0]).toContain('Host port collision');
+  });
+});
+
+describe('Podman Secret references', () => {
+  const secret = (name: string, data: object, namespace = 'default') => JSON.stringify({ apiVersion: 'v1', kind: 'Secret', metadata: { name, namespace }, stringData: data });
+
+  it('keeps identities when two Secrets use the same key and one key has multiple consumers', () => {
+    const input = [simple({ env: [{ name: 'FIRST', valueFrom: { secretKeyRef: { name: 'first', key: 'password' } } }, { name: 'SECOND', valueFrom: { secretKeyRef: { name: 'second', key: 'password' } } }, { name: 'SHARED', valueFrom: { secretKeyRef: { name: 'first', key: 'password' } } }] }), secret('first', { password: 'never-output-first' }), secret('second', { password: 'never-output-second' })].join('\n---\n');
+    const result = convertKubernetes(input, 'quadlet');
+    expect(result.errors).toEqual([]);
+    expect(result.secretReferences).toHaveLength(2);
+    const unit = result.files.find(file => file.name.endsWith('.container'))!.content;
+    expect(unit).toContain('Secret=k8s-7-default-5-first-password,type=env,target=FIRST');
+    expect(unit).toContain('Secret=k8s-7-default-6-second-password,type=env,target=SECOND');
+    expect(unit).toContain('Secret=k8s-7-default-5-first-password,type=env,target=SHARED');
+    expect(JSON.stringify(result)).not.toContain('never-output');
+  });
+
+  it('preserves env precedence and imports only the surviving Secret references', () => {
+    const input = [simple({ envFrom: [{ secretRef: { name: 'config' }, prefix: 'APP_' }], env: [{ name: 'APP_PASSWORD', value: 'literal' }] }), secret('config', { PASSWORD: 'never-output', OTHER: 'required' })].join('\n---\n');
+    const result = convertKubernetes(input, 'quadlet');
+    expect(result.secretReferences?.map(ref => ref.key)).toEqual(['OTHER']);
+    expect(result.files.find(file => file.name.endsWith('.container'))!.content).toContain('Environment="APP_PASSWORD=literal"');
+  });
+
+  it('mounts selected Secret keys with their paths, modes and ownership', () => {
+    const input = [pod({ securityContext: { runAsUser: 10000, fsGroup: 10000 }, containers: [{ name: 'app', image: 'nginx', volumeMounts: [{ name: 'key', mountPath: '/etc/app/private.pem', subPath: 'key.pem' }] }], volumes: [{ name: 'key', secret: { secretName: 'signing', items: [{ key: 'tls.key', path: 'key.pem', mode: 0o400 }] } }] }), secret('signing', { 'tls.key': 'never-output-private-key', 'ignored': 'unused' })].join('\n---\n');
+    const result = convertKubernetes(input, 'quadlet');
+    expect(result.errors).toEqual([]);
+    expect(result.secretReferences).toHaveLength(1);
+    expect(result.files.find(file => file.name.endsWith('.container'))!.content).toContain('type=mount,target=/etc/app/private.pem,uid=10000,gid=10000,mode=0400');
+    expect(JSON.stringify(result)).not.toContain('never-output');
+  });
+
+  it('retains empty env values without creating zero-byte Podman secrets', () => {
+    const input = [simple({ envFrom: [{ secretRef: { name: 'config' } }] }), secret('config', { EMPTY: '', OTHER: 'value' })].join('\n---\n');
+    const result = convertKubernetes(input, 'quadlet');
+    expect(result.secretReferences?.map(ref => ref.key)).toEqual(['OTHER']);
+    expect(result.files.find(file => file.name.endsWith('.container'))!.content).toContain('Environment="EMPTY="');
+  });
+
+  it('requires missing envFrom key inventories and rejects path traversal', () => {
+    expect(convertKubernetes(simple({ envFrom: [{ secretRef: { name: 'absent' } }] }), 'quadlet').errors[0]).toContain('include Secret absent');
+    const input = pod({ containers: [{ name: 'app', image: 'nginx', volumeMounts: [{ name: 'secret', mountPath: '/secret' }] }], volumes: [{ name: 'secret', secret: { secretName: 'external', items: [{ key: 'password', path: '../escape' }] } }] });
+    expect(convertKubernetes(input, 'quadlet').errors[0]).toContain('Unsafe Secret item path');
+  });
+});
+
+describe('Harbor chart compatibility', () => {
+  it('converts the complete upstream fixture without losing required mounts', () => {
+    const result = convertKubernetes(harborManifest, 'quadlet');
+    expect(result.errors).toEqual([]);
+    expect(result.files.filter(file => file.name.endsWith('.container'))).toHaveLength(13);
+    expect(result.files.filter(file => file.name.endsWith('.pod'))).toHaveLength(11);
+    expect(result.secretReferences).toHaveLength(13);
+    const core = result.files.find(file => file.name === 'harbor-harbor-core.container')!.content;
+    expect(core).toContain('type=mount,target=/etc/core/key');
+    expect(core).toContain('type=mount,target=/etc/core/private_key.pem');
+    expect(result.files.find(file => file.name === 'harbor-harbor-registry-registry.container')!.content).toContain('type=mount,target=/etc/registry/passwd');
+    expect(result.files.find(file => file.name === 'harbor-harbor-database.container')!.content).toContain('Requires=harbor-harbor-database-init-data-permissions-ensurer.container');
+    expect(result.files.find(file => file.name.includes('-init-') && file.name.endsWith('.container'))!.content).toContain('Type=oneshot');
+    expect(result.warnings.join('\n')).not.toContain('subPath on volume');
+    expect(result.warnings.join('\n')).not.toContain('initContainers is not converted');
+    expect(JSON.stringify(result)).not.toContain('harbor-test-');
+    expect(result.files.find(file => file.name === 'config/harbor-service-harbor-core/haproxy.cfg')!.content).toContain('harbor-harbor-core:8080');
+    expect(result.files.find(file => file.name === 'harbor-service-harbor-core.pod')!.content).toContain('NetworkAlias=harbor-core');
+    expect(result.files.find(file => file.name === 'harbor-harbor-database.pod')!.content).toContain('ExitPolicy=continue');
+    expect(result.files.find(file => file.name === 'harbor-service-harbor-core.container')!.content).toContain('AddCapability="NET_BIND_SERVICE"');
+    expect(result.files.find(file => file.name === 'start-quadlets.sh')!.content).not.toContain('-init-');
+  });
+
+  it('keeps the separate Secret export outside normal files', () => {
+    expect(exportKubernetesSecrets(harborManifest)).toContain('aGFyYm9yLXRlc3Qt');
+    expect(convertKubernetes(harborManifest, 'quadlet').files.map(file => file.name)).not.toContain('secrets.json');
   });
 });

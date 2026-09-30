@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { strToU8, zipSync } from 'fflate';
 import { refDebounced } from '@vueuse/core';
-import { type ConversionTarget, convertKubernetes } from './kubernetes-converter.service';
+import { type ConversionTarget, convertKubernetes, exportKubernetesSecrets } from './kubernetes-converter.service';
 import { exampleManifest, multiContainerExample } from './kubernetes-converter.examples';
 import { manifestInput } from './kubernetes-converter.state';
 import TextareaCopyable from '@/components/TextareaCopyable.vue';
@@ -23,7 +23,7 @@ const targets: { value: ConversionTarget; label: string; route: string }[] = [
 const instructions = computed(() => props.target === 'compose'
   ? 'Extract the bundle, then run docker compose up -d from that directory.'
   : props.target === 'quadlet'
-    ? 'Extract all files into ~/.config/containers/systemd/, run systemctl --user daemon-reload, then start the generated container services. Requires Podman 5+ with pod Quadlet support.'
+    ? 'Extract all files into ~/.config/containers/systemd/, run systemctl --user daemon-reload, then run bash start-quadlets.sh. Requires Podman 5.8+ with pod Quadlet support.'
     : `Extract the bundle, then run bash ${props.target}.sh from that directory.`);
 
 function downloadBytes(bytes: Uint8Array, filename: string, mime: string) {
@@ -39,9 +39,13 @@ function downloadFile() {
     downloadBytes(strToU8(selectedFile.value.content), selectedFile.value.name.split('/').pop()!, 'text/plain;charset=utf-8');
   }
 }
+function downloadSecrets() {
+  downloadBytes(strToU8(exportKubernetesSecrets(input.value)), 'secrets.json', 'application/json');
+}
 function downloadBundle() {
   const files = Object.fromEntries(result.value.files.map(file => [file.name, strToU8(file.content)]));
-  const notes = `${instructions.value}\n\nConversion notes:\n${result.value.warnings.map(warning => `- ${warning}`).join('\n')}\n`;
+  const secretInstructions = result.value.secretReferences?.length ? '\nImport referenced Secrets first: python3 import-secrets.py /path/to/secrets.json. Download Secret values separately or provide Kubernetes Secret JSON/List. Keep this file private (chmod 600), out of git, and recreate consumers after rotation.\n' : '';
+  const notes = `${instructions.value}${secretInstructions}\n\nConversion notes:\n${result.value.warnings.map(warning => `- ${warning}`).join('\n')}\n`;
   files['README.txt'] = strToU8(notes);
   downloadBytes(zipSync(files), `kubernetes-${props.target}.zip`, 'application/zip');
 }
@@ -101,6 +105,18 @@ function downloadBundle() {
           {{ warning }}
         </li>
       </ul>
+    </n-alert>
+
+    <n-alert v-if="result.secretReferences?.length && (target === 'quadlet' || target === 'podman-run')" title="Supply Podman secrets before starting" type="info" mt-5>
+      <p>
+        The bundle contains named Secret references and an import script, with no Secret values.
+        Run <code>python3 import-secrets.py /path/to/secrets.json</code> before starting containers.
+        You can supply Kubernetes Secret JSON yourself, or download the values from this input separately.
+        That separate JSON contains credentials; keep it private and out of git. Rotation requires recreating consumers.
+      </p>
+      <c-button secondary @click="downloadSecrets">
+        Download Secret values separately (.json)
+      </c-button>
     </n-alert>
 
     <template v-if="result.files.length">

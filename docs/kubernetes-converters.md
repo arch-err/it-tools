@@ -18,8 +18,10 @@ Input remains in memory when switching outputs; it is not saved to localStorage.
 | Pod, Deployment, ReplicaSet, StatefulSet, DaemonSet, Job, CronJob | One Pod instance with its containers |
 | Image, command, args, workingDir | Container image and process configuration |
 | Literal env, ConfigMap envFrom/key references | Container environment |
-| Secret/missing env references | Host environment references and explicit notes; no secret values exported |
-| Service selectors and named target ports | Network aliases; service-to-target port differences produce notes |
+| Secret envFrom/key references and mounts | Native Podman secrets with namespace/name/key identity, target paths and modes; values imported separately |
+| Missing non-Secret env references | Host environment references and explicit notes |
+| Regular init containers | Ordered one-shot services/foreground commands before main containers |
+| Service selectors and named target ports | Network aliases; TCP port differences use generated HAProxy Services |
 | hostPort and nodePort | Explicit published ports, defaulting to loopback |
 | ConfigMap mounts/items/subPath | Read-only file mounts and companion files |
 | PVC and StatefulSet volumeClaimTemplates | Empty local named volumes; existing data is not migrated |
@@ -35,18 +37,31 @@ its sidecars. Quadlet and Podman run create actual Podman pods on a shared
 network. Recreating a Docker primary container can require recreating sidecars
 that share its network namespace.
 
-Unsupported kinds and Pod/container fields produce conversion notes. Init
-containers, probes, scheduling, ingress/network policies, storage provisioning,
-projected/CSI/Secret mounts and cluster controllers are not reproduced. Service
-ports are not proxied: clients must use the target container port when it differs
-from the original service port. Namespace-scoped short Service aliases can be
+Unsupported kinds and Pod/container fields produce conversion notes. Restartable
+init sidecars, probes, scheduling, ingress/network policies, storage provisioning,
+projected/CSI mounts and cluster controllers are not reproduced. TCP Service port
+translation uses generated HAProxy pods; UDP/host-network translation is not supported. Namespace-scoped short Service aliases can be
 ambiguous on the shared local network; use qualified names when necessary.
 
 ZIP downloads contain every generated file and a README with conversion notes.
 Run scripts create containers but are not idempotent redeployment scripts; remove
 existing containers/pods before rerunning them. Quadlets target rootless Podman
-5+ and require all units and companion files in the same extracted directory.
+5.8+ and require all units and companion files in the same extracted directory.
 The converter never executes the generated commands or starts workloads.
+
+For Quadlet/Podman run, `secret-references.json` and `import-secrets.py` preserve
+Secret source identity without including values. The separate **Download Secret
+values** action exports Kubernetes Secret JSON from the exact pasted rendering;
+normal file output and ZIP downloads exclude those values. Literal env and ConfigMap
+contents are preserved, including any credentials embedded there. Import before startup.
+Rotating Podman secrets requires recreating consuming containers. Intentional
+empty env values do not create zero-byte secrets. Compose/Docker run still require
+host env values and do not reproduce Secret mounts; their notes identify sources.
+Podman named volumes use `:U` when approximating fsGroup, changing local ownership.
+
+See [the Harbor integration fixture](../fixtures/harbor/README.md) for the pinned
+upstream chart, rendering settings, Secret workflow, and authenticated OCI smoke
+test. `pnpm convert:kubernetes` calls the browser converter for CLI validation.
 
 ## Development
 
