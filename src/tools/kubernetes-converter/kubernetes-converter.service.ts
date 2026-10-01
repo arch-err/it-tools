@@ -2,6 +2,20 @@ import { parseAllDocuments, stringify } from 'yaml';
 import secretBootstrap from './secret-bootstrap.py?raw';
 
 export type ConversionTarget = 'compose' | 'quadlet' | 'docker-run' | 'podman-run';
+export interface QuadletOptions {
+  description: string;
+  after: string[];
+  wants: string[];
+  restart: 'manifest' | 'no' | 'always' | 'on-failure';
+  wantedBy: string[];
+}
+export const defaultQuadletOptions: QuadletOptions = {
+  description: '',
+  after: ['network-online.target'],
+  wants: ['network-online.target'],
+  restart: 'manifest',
+  wantedBy: ['default.target'],
+};
 export interface OutputFile {
   name: string;
   content: string;
@@ -144,7 +158,11 @@ function unitWord(value: string): string {
   return JSON.stringify(value.replace(/%/g, '%%')).replace(/\\u0000/g, '\\x00');
 }
 
-export function convertKubernetes(input: string, target: ConversionTarget): ConversionResult {
+export function convertKubernetes(
+  input: string,
+  target: ConversionTarget,
+  quadletOptions: Partial<QuadletOptions> = {},
+): ConversionResult {
   const warnings = new Set<string>();
   const files: OutputFile[] = [];
   const volumes = new Set<string>();
@@ -822,7 +840,7 @@ export function convertKubernetes(input: string, target: ConversionTarget): Conv
     if (target === 'compose') {
       files.unshift({ name: 'compose.yaml', content: renderCompose(workloads, volumes) });
     } else if (target === 'quadlet') {
-      files.unshift(...renderQuadlet(workloads, volumes));
+      files.unshift(...renderQuadlet(workloads, volumes, quadletOptions));
     } else {
       files.unshift({
         name: `${target}.sh`,
@@ -953,7 +971,32 @@ function renderCompose(workloads: Workload[], volumes: Set<string>): string {
   );
 }
 
-function renderQuadlet(workloads: Workload[], volumes: Set<string>): OutputFile[] {
+function renderQuadlet(workloads: Workload[], volumes: Set<string>, overrides: Partial<QuadletOptions>): OutputFile[] {
+  const options = { ...defaultQuadletOptions, ...overrides };
+  const description = options.description.trim()
+    ? text(options.description, 'Quadlet description').replace(/\\/g, '\\\\').replace(/%/g, '%%')
+    : '';
+  const units = (values: string[], label: string) => [
+    ...new Set(
+      values.map((value) => {
+        if (
+          !/^[a-zA-Z0-9_.:@-]+\.(?:target|service|socket|mount|automount|path|timer|slice|scope|container|pod|network|volume)$/.test(
+            value,
+          )
+        ) {
+          throw new Error(`${label} must contain systemd unit names, such as network-online.target.`);
+        }
+        return value;
+      }),
+    ),
+  ];
+  const after = units(options.after, 'After targets');
+  const wants = units(options.wants, 'Wants targets');
+  const wantedBy = units(options.wantedBy, 'WantedBy');
+  if (!['manifest', 'no', 'always', 'on-failure'].includes(options.restart)) {
+    throw new Error('Unsupported Quadlet restart policy.');
+  }
+
   const files: OutputFile[] = [{ name: 'kubernetes-local.network', content: '[Network]\n' }];
   for (const volume of volumes) {
     files.push({ name: `${volume}.volume`, content: `[Volume]\nVolumeName=${volume}\n` });
@@ -980,7 +1023,9 @@ function renderQuadlet(workloads: Workload[], volumes: Set<string>): OutputFile[
       const dependencies = container.init ? (previous ? [previous] : []) : initializers;
       const lines = [
         '[Unit]',
-        `Description=Kubernetes workload ${container.id}`,
+        `Description=${description || `Kubernetes workload ${container.id}`}`,
+        ...after.map((unit) => `After=${unit}`),
+        ...wants.map((unit) => `Wants=${unit}`),
         ...dependencies.flatMap((dependency) => [
           `Requires=${dependency.id}.container`,
           `After=${dependency.id}.container`,
@@ -1046,21 +1091,23 @@ function renderQuadlet(workloads: Workload[], volumes: Set<string>): OutputFile[
         '[Service]',
         ...(container.init
           ? ['Type=oneshot', 'RemainAfterExit=yes', 'Restart=no']
-          : [`Restart=${{ Always: 'always', OnFailure: 'on-failure', Never: 'no' }[workload.restart]}`]),
+          : [
+              `Restart=${options.restart === 'manifest' ? { Always: 'always', OnFailure: 'on-failure', Never: 'no' }[workload.restart] : options.restart}`,
+            ]),
         'TimeoutStartSec=900',
       );
-      if (!container.init) {
-        lines.push('', '[Install]', 'WantedBy=default.target');
+      if (!container.init && wantedBy.length) {
+        lines.push('', '[Install]', ...wantedBy.map((unit) => `WantedBy=${unit}`));
       }
       files.push({ name: `${container.id}.container`, content: `${lines.join('\n')}\n` });
     }
   }
-  const units = workloads.flatMap((workload) =>
+  const startUnits = workloads.flatMap((workload) =>
     workload.containers.filter((container) => !container.init).map((container) => `${container.id}.service`),
   );
   files.push({
     name: 'start-quadlets.sh',
-    content: `#!/usr/bin/env bash\nset -euo pipefail\nsystemctl --user daemon-reload\nsystemctl --user start ${units.map(shellWord).join(' ')}\n`,
+    content: `#!/usr/bin/env bash\nset -euo pipefail\nsystemctl --user daemon-reload\nsystemctl --user start ${startUnits.map(shellWord).join(' ')}\n`,
   });
   return files;
 }

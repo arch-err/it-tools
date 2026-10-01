@@ -93,3 +93,7 @@ instance uses a pinned image digest; future builds do not silently upgrade it.
 ## Fork base
 
 This fork tracks `sharevb/it-tools`, branch `chore/all-my-stuffs` (base `fad759e`, release 2026.09.27). The Kubernetes suite, Harbor fixtures, and GHCR publishing workflow are maintained in `arch-err/it-tools`.
+
+## Quadlet systemd options
+
+The Quadlet tool provides Description, After, Wants, Restart Policy, and WantedBy controls, matching the Compose → Quadlets options panel. They update the displayed files and downloads. An empty Description preserves generated workload descriptions; restart defaults to the Kubernetes restartPolicy. After/Wants default to network-online.target, and WantedBy defaults to default.target for rootless user services. Empty target lists omit those optional directives. Init containers always remain one-shot, with Restart=no and their required dependency ordering intact. Options stay in memory when switching converters.

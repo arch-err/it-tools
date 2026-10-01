@@ -3,13 +3,19 @@ import { strToU8, zipSync } from 'fflate';
 import { refDebounced } from '@vueuse/core';
 import { type ConversionTarget, convertKubernetes, exportKubernetesSecrets } from './kubernetes-converter.service';
 import { exampleManifest, multiContainerExample } from './kubernetes-converter.examples';
-import { manifestInput } from './kubernetes-converter.state';
+import { manifestInput, quadletOptions } from './kubernetes-converter.state';
 import TextareaCopyable from '@/components/TextareaCopyable.vue';
 
 const props = defineProps<{ target: ConversionTarget }>();
 const input = manifestInput;
 const debouncedInput = refDebounced(input, 200);
-const result = computed(() => convertKubernetes(debouncedInput.value, props.target));
+const result = computed(() => convertKubernetes(debouncedInput.value, props.target, quadletOptions.value));
+const restartOptions = [
+  { label: 'From Kubernetes restartPolicy', value: 'manifest' },
+  { label: 'no', value: 'no' },
+  { label: 'always', value: 'always' },
+  { label: 'on-failure', value: 'on-failure' },
+];
 const selectedFilename = ref('');
 const selectedFile = computed(
   () =>
@@ -101,6 +107,28 @@ function downloadBundle() {
       test-id="kubernetes-input"
       :spellcheck="false"
     />
+
+    <c-card v-if="target === 'quadlet'" title="Options" mt-5>
+      <n-form-item label="Description:" label-placement="left">
+        <n-input v-model:value="quadletOptions.description" placeholder="Kubernetes workload <container name>" />
+      </n-form-item>
+      <n-form-item label="After Targets:" label-placement="left">
+        <n-dynamic-tags v-model:value="quadletOptions.after" />
+      </n-form-item>
+      <n-form-item label="Wants Targets:" label-placement="left">
+        <n-dynamic-tags v-model:value="quadletOptions.wants" />
+      </n-form-item>
+      <n-form-item label="Restart Policy:" label-placement="left">
+        <n-select v-model:value="quadletOptions.restart" :options="restartOptions" />
+      </n-form-item>
+      <n-form-item label="WantedBy:" label-placement="left">
+        <n-dynamic-tags v-model:value="quadletOptions.wantedBy" />
+      </n-form-item>
+      <p text-sm op-75>
+        Options apply to container units. Init containers keep their one-shot behavior and required ordering. WantedBy
+        defaults to default.target for user services.
+      </p>
+    </c-card>
 
     <n-alert v-if="result.errors.length" title="Cannot convert these manifests" type="error" mt-5>
       <div v-for="error in result.errors" :key="error" style="white-space: pre-wrap">

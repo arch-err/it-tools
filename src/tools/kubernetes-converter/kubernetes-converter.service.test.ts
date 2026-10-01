@@ -390,3 +390,73 @@ describe('Harbor chart compatibility', () => {
     expect(convertKubernetes(harborManifest, 'quadlet').files.map((file) => file.name)).not.toContain('secrets.json');
   });
 });
+
+describe('Quadlet systemd options', () => {
+  it('applies options to all containers while retaining init ordering and one-shot behavior', () => {
+    const result = convertKubernetes(harborManifest, 'quadlet', {
+      description: 'Harbor stack',
+      after: ['network-online.target', 'remote-fs.target'],
+      wants: ['network-online.target'],
+      restart: 'on-failure',
+      wantedBy: ['default.target', 'maintenance.target'],
+    });
+    expect(result.errors).toEqual([]);
+    for (const file of result.files.filter((file) => file.name.endsWith('.container'))) {
+      expect(file.content).toContain('Description=Harbor stack');
+      expect(file.content).toContain('After=remote-fs.target');
+      expect(file.content).toContain('Wants=network-online.target');
+    }
+    const containers = result.files.filter((file) => file.name.endsWith('.container'));
+    const initializers = containers.filter((file) => file.content.includes('Type=oneshot'));
+    expect(initializers).toHaveLength(1);
+    for (const file of initializers) {
+      expect(file.content).toContain('Restart=no');
+      expect(file.content).not.toContain('[Install]');
+    }
+    for (const file of containers.filter((file) => !file.content.includes('Type=oneshot'))) {
+      expect(file.content).toContain('Restart=on-failure');
+      expect(file.content).toContain('WantedBy=default.target\nWantedBy=maintenance.target');
+    }
+    expect(result.files.find((file) => file.name === 'harbor-harbor-database.container')!.content).toContain(
+      'After=harbor-harbor-database-init-data-permissions-ensurer.container',
+    );
+    expect(JSON.stringify(result)).not.toContain('harbor-test-');
+  });
+
+  it('allows empty target lists without dropping required init dependencies', () => {
+    const result = convertKubernetes(harborManifest, 'quadlet', { after: [], wants: [], wantedBy: [] });
+    expect(result.errors).toEqual([]);
+    const database = result.files.find((file) => file.name === 'harbor-harbor-database.container')!.content;
+    expect(database).not.toContain('network-online.target');
+    expect(database).not.toContain('[Install]');
+    expect(database).toContain('Requires=harbor-harbor-database-init-data-permissions-ensurer.container');
+    expect(database).toContain('After=harbor-harbor-database-init-data-permissions-ensurer.container');
+  });
+
+  it('keeps manifest restart policy by default and supports an explicit override', () => {
+    const input = pod({ restartPolicy: 'Never', containers: [{ name: 'app', image: 'nginx' }] });
+    expect(content(input, 'quadlet', 'default-test.container')).toContain('Restart=no');
+    expect(
+      convertKubernetes(input, 'quadlet', { restart: 'always' }).files.find((file) => file.name.endsWith('.container'))!
+        .content,
+    ).toContain('Restart=always');
+    expect(convertKubernetes(input, 'compose', { restart: 'always' })).toEqual(convertKubernetes(input, 'compose'));
+  });
+
+  it('rejects directive injection and escapes description specifiers and line continuations', () => {
+    expect(
+      convertKubernetes(simple(), 'quadlet', { after: ['network-online.target\nRequires=evil.service'] }).errors,
+    ).toHaveLength(1);
+    expect(
+      convertKubernetes(simple(), 'quadlet', { description: 'Stack\n[Service]\nExecStart=evil' }).errors,
+    ).toHaveLength(1);
+    const result = convertKubernetes(simple(), 'quadlet', {
+      description: 'Stack %n \\',
+      after: ['network-online.target', 'network-online.target'],
+    });
+    expect(result.errors).toEqual([]);
+    const file = result.files.find((file) => file.name.endsWith('.container'))!.content;
+    expect(file).toContain('Description=Stack %%n \\\\\n');
+    expect(file.match(/After=network-online.target/g)).toHaveLength(1);
+  });
+});
